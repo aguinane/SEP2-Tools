@@ -91,3 +91,12 @@ def get_pem_certificate_lfdi(cert_path: Path, group: bool = True):
     fingerprint = hashlib.sha256(der_bytes).hexdigest().upper()
     lfdi = get_lfdi(fingerprint, group=group)
     return lfdi
+
+
+def get_certificate_lfdi(cert_path: Path, group: bool = True):
+    """Load X.509 DER Certificate in PEM or DER format and return LFDI"""
+    if is_pem_certificate(cert_path):
+        lfdi = get_pem_certificate_lfdi(cert_path, group=group)
+    else:
+        lfdi = get_der_certificate_lfdi(cert_path, group=group)
+    return lfdi

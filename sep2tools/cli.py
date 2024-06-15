@@ -5,11 +5,7 @@ from typing import Optional
 import typer
 
 from .cert_create import generate_device_certificate, generate_key, generate_serca
-from .cert_id import (
-    get_der_certificate_lfdi,
-    get_pem_certificate_lfdi,
-    is_pem_certificate,
-)
+from .cert_id import get_certificate_lfdi
 from .version import __version__
 
 LOG_FORMAT = "%(asctime)s %(levelname)-8s %(message)s"
@@ -47,10 +43,7 @@ def cert_lfdi(
         msg = f"No such file {filepath}"
         raise FileNotFoundError(msg)
 
-    if is_pem_certificate(filepath):
-        lfdi = get_pem_certificate_lfdi(filepath)
-    else:
-        lfdi = get_der_certificate_lfdi(filepath)
+    lfdi = get_certificate_lfdi(filepath)
     typer.echo(f"The LFDI is: {lfdi}")
 
 
@@ -69,7 +62,7 @@ def create_serca(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None
 
     key_file = Path("root.key")
     key, csr = generate_key(key_file, generate_csr=False)
-    serca = generate_serca(key)
+    generate_serca(key)
 
 
 @app.command()
@@ -77,11 +70,13 @@ def create_cert(
     csr_path: Path,
     ca_cert: Path,
     ca_key: Path,
+    pen: int = 12345,
+    serno: str = "1",
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
-    hw_oid = "12345"
-    hw_sn = "1"
-    cert = generate_device_certificate(csr_path, ca_cert, ca_key, hw_oid, hw_sn)
+    cert_fp = generate_device_certificate(csr_path, ca_cert, ca_key, pen, serno)
+    lfdi = get_certificate_lfdi(cert_fp)
+    typer.echo(f"The LFDI is: {lfdi}")
