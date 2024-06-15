@@ -26,12 +26,21 @@ SEP2_DEV_POSTMANUF = ObjectIdentifier("1.3.6.1.4.1.40732.1.3")
 
 # IEEE 2030.5 policy assignments (Section 6.11.7.3)
 SEP2_TEST_CERT = ObjectIdentifier("1.3.6.1.4.1.40732.2.1")
-SEP2_TEST_SELFSIGNED = ObjectIdentifier("1.3.6.1.4.1.40732.2.2")
-SEP2_TEST_SERVPROV = ObjectIdentifier("1.3.6.1.4.1.40732.2.3")
-SEP2_TEST_BULK_CERT = ObjectIdentifier("1.3.6.1.4.1.40732.2.4")
+SEP2_SELFSIGNED = ObjectIdentifier("1.3.6.1.4.1.40732.2.2")
+SEP2_SERVPROV = ObjectIdentifier("1.3.6.1.4.1.40732.2.3")
+SEP2_BULK_CERT = ObjectIdentifier("1.3.6.1.4.1.40732.2.4")
 
 # HardwareModuleName (Section 6.11.7.4)
 SEP2_HARDWARE_MODULE_NAME = ObjectIdentifier("1.3.6.1.5.5.7.8.4")
+
+
+DEFAULT_POLICIES = [
+    SEP2_DEV_GENERIC,
+    SEP2_DEV_POSTMANUF,
+    SEP2_TEST_CERT,
+    SEP2_SELFSIGNED,
+    SEP2_BULK_CERT,
+]
 
 
 def random_id() -> str:
@@ -183,16 +192,21 @@ def generate_serca(
 
 
 def generate_device_certificate(
-    filename: Path,
     csr_path: Path,
     mica_cert_path: Path,
     mica_key_path: Path,
-    hardware_type_oid: str,
+    pen: int,
     hardware_serial_number: str,
-    policy_oids: list[ObjectIdentifier],
+    cert_file: Path | None = None,
     serca_cert_path: Optional[Path] = None,
+    policy_oids: list[ObjectIdentifier] = DEFAULT_POLICIES,
 ) -> Path:
     """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
+
+    if not cert_file:
+        output_dir = csr_path.parent
+        cert_name = f"{csr_path.stem}-cert.pem"
+        cert_file = output_dir / cert_name
 
     with open(csr_path, "rb") as pem_file:
         csr_data = pem_file.read()
@@ -207,6 +221,8 @@ def generate_device_certificate(
     valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
 
     policies = [x509.PolicyInformation(oid, None) for oid in policy_oids]
+
+    hardware_type_oid = f"1.3.6.1.4.1.40732.{pen}.1"
 
     # SAN OtherName encoder
     encoder = asn1.Encoder()
@@ -276,12 +292,12 @@ def generate_device_certificate(
             serca_pem_data = pem_file.read()
 
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
-    with open(filename, "wb") as fh:
+    with open(cert_file, "wb") as fh:
         fh.write(cert_pem)
         # Append the intermediate certificate
         fh.write(mica_pem_data)
         # Append the root certificate
         if serca_pem_data:
             fh.write(serca_pem_data)
-        log.info("Created Cert %s", filename)
-    return filename
+        log.info("Created Cert %s", cert_file)
+    return cert_file
