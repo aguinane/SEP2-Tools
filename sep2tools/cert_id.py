@@ -61,6 +61,12 @@ def get_fingerprint(cert_path: Path) -> str:
         return readable_hash
 
 
+def is_pem_certificate(cert_path: Path) -> bool:
+    with open(cert_path, "rb") as f:
+        first_line = f.readline()
+        return b"-----BEGIN CERTIFICATE-----" in first_line
+
+
 def get_der_certificate_lfdi(cert_path: Path, group: bool = True):
     """Load X.509 DER Certificate and return LFDI"""
 

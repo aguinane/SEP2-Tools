@@ -23,6 +23,9 @@ dependencies = ["cryptography", "asn1", "python-dateutil"]
 [project.optional-dependencies]
 test = ["ruff", "pytest >=2.7.3", "pytest-cov", "mypy"]
 
+[project.scripts]
+sep2tools = "sep2tools.cli:app"
+
 [project.urls]
 Source = "https://github.com/aguinane/SEP2-Tools"
 

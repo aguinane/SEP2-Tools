@@ -1,9 +1,8 @@
-from sep2tools import get_lfdi, get_sfdi
+from sep2tools.cert_id import get_lfdi, get_sfdi
 
 EXAMPLE_FINGERPRINT = (
     "3E4F-45AB-31ED-FE5B-67E3-43E5-E456-2E31-984E-23E5-349E-2AD7-4567-2ED1-45EE-213A"
 )
-
 
 
 def test_lfdi():

@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -13,8 +14,7 @@ from dateutil import tz
 
 log = logging.getLogger(__name__)
 
-DEFAULT_KEY_PATH = Path("key.pem")
-DEFAULT_CSR_PATH = Path("csr.pem")
+DEFAULT_OUTPUT = Path("certs")
 
 # IEEE 2030.5 device type assignments (Section 6.11.7.2)
 SEP2_DEV_GENERIC = ObjectIdentifier("1.3.6.1.4.1.40732.1.1")
@@ -31,10 +31,21 @@ SEP2_TEST_BULK_CERT = ObjectIdentifier("1.3.6.1.4.1.40732.2.4")
 SEP2_HARDWARE_MODULE_NAME = ObjectIdentifier("1.3.6.1.5.5.7.8.4")
 
 
-def generate_key_and_csr(
-    key_file: Path = DEFAULT_KEY_PATH, csr_file: Path = DEFAULT_CSR_PATH
-) -> tuple[Path, Path]:
+def random_id() -> str:
+    return str(uuid.uuid4()).replace("-", "")[:10].upper()
+
+
+def generate_key_and_csr(key_file: Path | None = None) -> tuple[Path, Path]:
     """Generate a Private Key and Certificate Signing Request (CSR)"""
+
+    if not key_file:
+        output_dir = DEFAULT_OUTPUT
+        output_dir.mkdir(exist_ok=True)
+        name = random_id()
+        key_file = output_dir / f"{name}.key"
+
+    csr_file = key_file.with_suffix(".csr")
+
     key = ec.generate_private_key(ec.SECP256R1)
     key_pem = key.private_bytes(
         encoding=serialization.Encoding.PEM,
