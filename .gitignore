@@ -163,3 +163,7 @@ cython_debug/
 
 
 certs/
+*.pem
+*.key
+*.csr
+*.der

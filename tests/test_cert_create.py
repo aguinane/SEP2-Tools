@@ -1,5 +1,4 @@
-
-from sep2tools.cert_create import generate_key_and_csr
+from sep2tools.cert_create import generate_key
 
 EXAMPLE_PEN = 1234
 
@@ -7,7 +6,7 @@ EXAMPLE_PEN = 1234
 def test_key_creation():
     """Create Private Key and CSR"""
 
-    key, csr = generate_key_and_csr()
+    key, csr = generate_key()
 
     with open(key) as fh:
         lines = fh.readlines()

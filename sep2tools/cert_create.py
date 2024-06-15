@@ -6,15 +6,18 @@ from typing import Optional
 
 import asn1
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.hashes import SHA256
-from cryptography.x509.oid import ObjectIdentifier
+from cryptography.x509.oid import NameOID, ObjectIdentifier
 from dateutil import tz
 
 log = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = Path("certs")
+
+ANY_POLICY_OID = ObjectIdentifier("2.5.29.32.0")  # OID for "X509v3 Any Policy"
 
 # IEEE 2030.5 device type assignments (Section 6.11.7.2)
 SEP2_DEV_GENERIC = ObjectIdentifier("1.3.6.1.4.1.40732.1.1")
@@ -35,7 +38,9 @@ def random_id() -> str:
     return str(uuid.uuid4()).replace("-", "")[:10].upper()
 
 
-def generate_key_and_csr(key_file: Path | None = None) -> tuple[Path, Path]:
+def generate_key(
+    key_file: Path | None = None, generate_csr: bool = True
+) -> tuple[Path, Path | None]:
     """Generate a Private Key and Certificate Signing Request (CSR)"""
 
     if not key_file:
@@ -43,8 +48,6 @@ def generate_key_and_csr(key_file: Path | None = None) -> tuple[Path, Path]:
         output_dir.mkdir(exist_ok=True)
         name = random_id()
         key_file = output_dir / f"{name}.key"
-
-    csr_file = key_file.with_suffix(".csr")
 
     key = ec.generate_private_key(ec.SECP256R1)
     key_pem = key.private_bytes(
@@ -56,16 +59,20 @@ def generate_key_and_csr(key_file: Path | None = None) -> tuple[Path, Path]:
         fh.write(key_pem)
         log.info("Created Key at %s", key_file)
 
-    subject_name = ""
-    csr = (
-        x509.CertificateSigningRequestBuilder()
-        .subject_name(x509.Name(subject_name))
-        .sign(key, SHA256())
-    )
-    csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-    with open(csr_file, "wb") as fh:
-        fh.write(csr_pem)
-        log.info("Created CSR at %s", csr_file)
+    csr_file = None
+    if generate_csr:
+        csr_file = key_file.with_suffix(".csr")
+        subject_name = ""
+        csr = (
+            x509.CertificateSigningRequestBuilder()
+            .subject_name(x509.Name(subject_name))
+            .sign(key, SHA256())
+        )
+        csr_pem = csr.public_bytes(serialization.Encoding.PEM)
+        with open(csr_file, "wb") as fh:
+            fh.write(csr_pem)
+            log.info("Created CSR at %s", csr_file)
+
     return key_file, csr_file
 
 
@@ -78,7 +85,101 @@ def convert_pem_to_der(filename: Path) -> Path:
     output_der_path = filename.with_suffix(".der")
     with open(output_der_path, "wb") as fh:
         fh.write(der_data)
+        log.info("Created %s from %s", output_der_path, filename)
     return output_der_path
+
+
+def generate_serca(
+    key_file: Path,
+    cert_file: Path | None = None,
+    org_name: str = "Smart Energy",
+    country_name: str = "AU",
+) -> Path:
+    """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
+
+    if not cert_file:
+        output_dir = key_file.parent
+        output_dir.mkdir(exist_ok=True)
+        if key_file.suffix == "pem":
+            cert_name = f"{key_file.stem}-root.pem"
+        else:
+            cert_name = f"{key_file.stem}.pem"
+        cert_file = output_dir / cert_name
+
+    with open(key_file, "rb") as pem_file:
+        pem_data = pem_file.read()
+    key = serialization.load_pem_private_key(pem_data, password=None)
+
+    valid_from = datetime.now(tz=tz.UTC)
+    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+
+    policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
+
+    # Define the Subject Name
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, country_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
+            x509.NameAttribute(NameOID.COMMON_NAME, "IEEE 2030.5 Root"),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, "1"),
+        ]
+    )
+
+    # Generate a Subject Key Identifier (SKI)
+    ski = key.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    ski_digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+    ski_digest.update(ski)
+    ski_value = ski_digest.finalize()
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(valid_from)
+        .not_valid_after(valid_to)
+        .add_extension(
+            x509.BasicConstraints(ca=True, path_length=None),
+            critical=True,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier(ski_value),
+            critical=False,
+        )
+        .add_extension(
+            x509.CertificatePolicies(policies=policies),
+            critical=True,
+        )
+        .sign(key, SHA256())
+    )
+
+    cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
+    with open(cert_file, "wb") as fh:
+        fh.write(cert_pem)
+        log.info("Created SERCA %s", cert_file)
+
+    convert_pem_to_der(cert_file)
+
+    return cert_file
 
 
 def generate_device_certificate(

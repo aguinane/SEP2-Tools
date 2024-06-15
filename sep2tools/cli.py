@@ -4,7 +4,7 @@ from typing import Optional
 
 import typer
 
-from .cert_create import generate_key_and_csr
+from .cert_create import generate_key, generate_serca
 from .cert_id import (
     get_der_certificate_lfdi,
     get_pem_certificate_lfdi,
@@ -59,4 +59,14 @@ def create_key(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
-    key, csr = generate_key_and_csr()
+    key, csr = generate_key()
+
+
+@app.command()
+def create_serca(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+    log_level = "DEBUG" if verbose else "INFO"
+    logging.basicConfig(level=log_level, format=LOG_FORMAT)
+
+    key_file = Path("root.key")
+    key, csr = generate_key(key_file, generate_csr=False)
+    serca = generate_serca(key)
