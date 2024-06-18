@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -21,9 +20,7 @@ def version_callback(value: bool):
 
 @app.callback()
 def callback(
-    version: Optional[bool] = typer.Option(
-        None, "--version", callback=version_callback
-    ),
+    version: bool = typer.Option(False, "--version", callback=version_callback),
 ) -> None:
     """sep2tools
 
@@ -33,9 +30,7 @@ def callback(
 
 
 @app.command()
-def cert_lfdi(
-    filepath: Path, verbose: bool = typer.Option(False, "--verbose", "-v")
-) -> None:
+def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
@@ -48,7 +43,7 @@ def cert_lfdi(
 
 
 @app.command()
-def create_key(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+def create_key(verbose: bool = False) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
@@ -56,7 +51,7 @@ def create_key(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
 
 
 @app.command()
-def create_serca(verbose: bool = typer.Option(False, "--verbose", "-v")) -> None:
+def create_serca(verbose: bool = False) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
@@ -72,7 +67,7 @@ def create_cert(
     ca_key: Path,
     pen: int = 12345,
     serno: str = "1",
-    verbose: bool = typer.Option(False, "--verbose", "-v"),
+    verbose: bool = False,
 ) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)

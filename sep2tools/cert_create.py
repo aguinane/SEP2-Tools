@@ -2,7 +2,6 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import asn1
 from cryptography import x509
@@ -85,17 +84,19 @@ def generate_key(
     return key_file, csr_file
 
 
-def convert_pem_to_der(filename: Path) -> Path:
+def convert_pem_to_der(pem_file: Path, der_file: Path | None = None) -> Path:
     """Convert a PEM file to DER Certificate"""
-    with open(filename, "rb") as pem_file:
-        cert_data = pem_file.read()
+    with open(pem_file, "rb") as fh:
+        cert_data = fh.read()
     cert = x509.load_pem_x509_certificate(cert_data)
     der_data = cert.public_bytes(encoding=serialization.Encoding.DER)
-    output_der_path = filename.with_suffix(".der")
-    with open(output_der_path, "wb") as fh:
+
+    if not der_file:
+        der_file = pem_file.with_suffix(".der")
+    with open(der_file, "wb") as fh:
         fh.write(der_data)
-        log.info("Created %s from %s", output_der_path, filename)
-    return output_der_path
+        log.info("Created %s from %s", der_file, pem_file)
+    return der_file
 
 
 def generate_serca(
@@ -103,7 +104,7 @@ def generate_serca(
     cert_file: Path | None = None,
     org_name: str = "Smart Energy",
     country_name: str = "AU",
-) -> Path:
+) -> tuple[Path, Path]:
     """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
 
     if not cert_file:
@@ -115,8 +116,8 @@ def generate_serca(
             cert_name = f"{key_file.stem}.pem"
         cert_file = output_dir / cert_name
 
-    with open(key_file, "rb") as pem_file:
-        pem_data = pem_file.read()
+    with open(key_file, "rb") as fh:
+        pem_data = fh.read()
     key = serialization.load_pem_private_key(pem_data, password=None)
 
     valid_from = datetime.now(tz=tz.UTC)
@@ -186,37 +187,37 @@ def generate_serca(
         fh.write(cert_pem)
         log.info("Created SERCA %s", cert_file)
 
-    convert_pem_to_der(cert_file)
+    der_file = convert_pem_to_der(cert_file)
 
-    return cert_file
+    return cert_file, der_file
 
 
 def generate_device_certificate(
     csr_path: Path,
-    mica_cert_path: Path,
-    mica_key_path: Path,
+    ca_cert_path: Path,
+    ca_key_path: Path,
     pen: int,
     hardware_serial_number: str,
     cert_file: Path | None = None,
-    serca_cert_path: Optional[Path] = None,
+    serca_cert_path: Path | None = None,
     policy_oids: list[ObjectIdentifier] = DEFAULT_POLICIES,
 ) -> Path:
-    """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
+    """Use a CSR and Signing Certificate key pair to generate a SEP2 Certificate"""
 
     if not cert_file:
         output_dir = csr_path.parent
         cert_name = f"{csr_path.stem}-cert.pem"
         cert_file = output_dir / cert_name
 
-    with open(csr_path, "rb") as pem_file:
-        csr_data = pem_file.read()
+    with open(csr_path, "rb") as fh:
+        csr_data = fh.read()
     csr = x509.load_pem_x509_csr(csr_data)
-    with open(mica_cert_path, "rb") as pem_file:
-        mica_pem_data = pem_file.read()
-    mica_cert = x509.load_pem_x509_certificate(mica_pem_data)
-    with open(mica_key_path, "rb") as pem_file:
-        pem_data = pem_file.read()
-    mica_key = serialization.load_pem_private_key(pem_data, password=None)
+    with open(ca_cert_path, "rb") as fh:
+        ca_pem_data = fh.read()
+    ca_cert = x509.load_pem_x509_certificate(ca_pem_data)
+    with open(ca_key_path, "rb") as fh:
+        pem_data = fh.read()
+    ca_key = serialization.load_pem_private_key(pem_data, password=None)
     valid_from = datetime.now(tz=tz.UTC)
     valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
 
@@ -235,7 +236,7 @@ def generate_device_certificate(
 
     sname = x509.Name("")  # SubjectName should be blank
 
-    issuer_name = mica_cert.subject
+    issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
     cert = (
         x509.CertificateBuilder()
@@ -265,7 +266,7 @@ def generate_device_certificate(
         )
         .add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-                mica_cert.extensions.get_extension_for_class(
+                ca_cert.extensions.get_extension_for_class(
                     x509.SubjectKeyIdentifier
                 ).value
             ),
@@ -283,19 +284,19 @@ def generate_device_certificate(
             x509.CertificatePolicies(policies=policies),
             critical=True,
         )
-        .sign(mica_key, SHA256())
+        .sign(ca_key, SHA256())
     )
 
     serca_pem_data = ""
     if serca_cert_path:
-        with open(serca_cert_path, "rb") as pem_file:
-            serca_pem_data = pem_file.read()
+        with open(serca_cert_path, "rb") as fh:
+            serca_pem_data = fh.read()
 
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
     with open(cert_file, "wb") as fh:
         fh.write(cert_pem)
         # Append the intermediate certificate
-        fh.write(mica_pem_data)
+        fh.write(ca_pem_data)
         # Append the root certificate
         if serca_pem_data:
             fh.write(serca_pem_data)

@@ -13,10 +13,9 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.9",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version", "description"]
 dependencies = ["cryptography", "asn1", "python-dateutil"]
 
@@ -38,7 +37,7 @@ omit = ["*/version.py", '*/__main__.py']
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 70
+fail_under = 85
 
 [tool.ruff.lint]
 select = ["A", "B", "E", "F", "I", "N", "SIM", "UP"]
