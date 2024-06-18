@@ -28,7 +28,7 @@ def get_role_flag(
 
     binary_str = f"000000000{g}{f}{e}{d}{c}{b}{a}"
     val = int(binary_str, 2)
-    hex_str = str(hex(val))[2:].zfill(2).upper()
+    hex_str = str(hex(val))[2:].zfill(4).upper()
     return binary_str, hex_str
 
 
@@ -63,7 +63,7 @@ def get_quality_flag(
 
     binary_str = f"000000000{g}{f}{e}{d}{c}{b}{a}"
     val = int(binary_str, 2)
-    hex_str = str(hex(val))[2:].zfill(2).upper()
+    hex_str = str(hex(val))[2:].zfill(4).upper()
     return binary_str, hex_str
 
 

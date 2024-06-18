@@ -12,11 +12,11 @@ def test_role_flags():
 
     # Site Reading
     binval, hexval = get_role_flag(is_mirror=1, is_premise=1)
-    assert hexval == "03"
+    assert hexval == "0003"
 
     # DER Reading
     binval, hexval = get_role_flag(is_mirror=1, is_der=1, is_submeter=1)
-    assert hexval == "49"
+    assert hexval == "0049"
 
 
 def test_quality_flags():
@@ -24,11 +24,11 @@ def test_quality_flags():
 
     # Valid
     binval, hexval = get_quality_flag(valid=1)
-    assert hexval == "01"
+    assert hexval == "0001"
 
     # Questionable
     binval, hexval = get_quality_flag(questionable=1)
-    assert hexval == "10"
+    assert hexval == "0010"
 
 
 def test_connect_status():
