@@ -17,7 +17,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dynamic = ["version", "description"]
-dependencies = ["cryptography", "asn1", "python-dateutil"]
+dependencies = ["cryptography", "asn1", "python-dateutil", "pydantic"]
 
 [project.optional-dependencies]
 test = ["ruff", "pytest >=2.7.3", "pytest-cov", "mypy"]
@@ -41,3 +41,4 @@ fail_under = 85
 
 [tool.ruff.lint]
 select = ["A", "B", "E", "F", "I", "N", "SIM", "UP"]
+ignore = ['N815']
