@@ -76,7 +76,7 @@ def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, in
     return sorted(list(split_events))
 
 
-def split_overlapping_events(events):
+def split_overlapping_events(events: list[ModeEvent]) -> list[ModeEvent]:
     # TODO: Handle adding random start and duration values without overlap.
     new_events = []
     times = [(x.start, x.end) for x in events]
@@ -93,7 +93,7 @@ def split_overlapping_events(events):
     return new_events
 
 
-def condense_events(events):
+def condense_mode_events(events: list[ModeEvent]) -> list[ModeEvent]:
     # First split the events
     events = split_overlapping_events(events)
 
@@ -111,87 +111,48 @@ def condense_events(events):
         )
         new_events.append(xevents[0])
 
-    return new_events
+    # Finally, restitch any events that were split that can be joined back together
+    new_events2 = []
+    for i, evt in enumerate(new_events):
+        if i == 0:
+            new_events2.append(evt)
+            continue
+        prev_evt = new_events[i - 1]
+        if prev_evt.mrid == evt.mrid:
+            evt.start = prev_evt.start  # Set to start from prev
+            new_events2.pop()  # Remove the previous
+        new_events2.append(evt)
+    return new_events2
 
 
-EXAMPLE_EVENTS = [
-    DERControl(
-        mRID="1",
-        creationTime=0,
-        currentStatus=0,
-        start=5,
-        duration=5,
-        controls=[
-            DERControlBase(mode="opModExpLimW", value=1500),
-            DERControlBase(mode="opModImpLimW", value=1500),
-        ],
-        primacy=1,
-    ),
-    DERControl(
-        mRID="2",
-        creationTime=0,
-        currentStatus=0,
-        start=10,
-        duration=5,
-        controls=[DERControlBase(mode="opModExpLimW", value=1.5, multiplier=3)],
-        primacy=1,
-    ),
-    DERControl(
-        mRID="2B",
-        creationTime=0,
-        currentStatus=0,
-        start=12,
-        duration=5,
-        controls=[DERControlBase(mode="opModExpLimW", value=2.0, multiplier=3)],
-        primacy=0,
-    ),
-    DERControl(
-        mRID="3",
-        creationTime=0,
-        currentStatus=0,
-        start=15,
-        duration=5,
-        controls=[DERControlBase(mode="opModExpLimW", value=1.5, multiplier=3)],
-        primacy=1,
-    ),
-]
+def condense_events(events: list[DERControl]) -> dict[str, list[ModeEvent]]:
+    schedule = {}
+    for evt in events:
+        mrid = evt.mRID
+        primacy = evt.primacy
+        creation_time = evt.creationTime
+        start = evt.start
+        end = evt.start + evt.duration
+        rand_start = evt.randomizeStart
+        rand_dur = evt.randomizeDuration
+        for cntrl in evt.controls:
+            value = cntrl.value * (10**cntrl.multiplier)
+            mode = cntrl.mode
+            if mode not in schedule:
+                schedule[mode] = []
 
-schedule = {}
-for evt in EXAMPLE_EVENTS:
-    mrid = evt.mRID
-    primacy = evt.primacy
-    creation_time = evt.creationTime
-    start = evt.start
-    end = evt.start + evt.duration
-    rand_start = evt.randomizeStart
-    rand_dur = evt.randomizeDuration
-    for cntrl in evt.controls:
-        value = cntrl.value * (10**cntrl.multiplier)
-        mode = cntrl.mode
-        if mode not in schedule:
-            schedule[mode] = []
+            me = ModeEvent(
+                mrid=mrid,
+                primacy=primacy,
+                creation_time=creation_time,
+                start=start,
+                end=end,
+                value=value,
+                rand_start=rand_start,
+                rand_dur=rand_dur,
+            )
+            schedule[mode].append(me)
 
-        me = ModeEvent(
-            mrid=mrid,
-            primacy=primacy,
-            creation_time=creation_time,
-            start=start,
-            end=end,
-            value=value,
-            rand_start=rand_start,
-            rand_dur=rand_dur,
-        )
-        schedule[mode].append(me)
-
-
-for mode in schedule:
-    print()
-    print(mode)
-    print()
-    events = schedule[mode]
-    for x in events:
-        print(x)
-    events = condense_events(events)
-    print("becomes ...")
-    for x in events:
-        print(x)
+    for mode in schedule:
+        schedule[mode] = condense_mode_events(schedule[mode])
+    return schedule
