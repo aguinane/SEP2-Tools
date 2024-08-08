@@ -59,7 +59,7 @@ def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, in
     unique_intervals = []
     current_interval_start = None
     active_events = 0
-    for i, (time, typ) in enumerate(time_points):
+    for time, typ in time_points:
         if current_interval_start is not None and time > current_interval_start:
             unique_intervals.append((current_interval_start, time))
         if typ == "start":
