@@ -201,6 +201,8 @@ def generate_device_certificate(
     cert_file: Path | None = None,
     serca_cert_path: Path | None = None,
     policy_oids: list[ObjectIdentifier] = DEFAULT_POLICIES,
+    valid_to: datetime | None = None,
+    subject_name: str = "",
 ) -> Path:
     """Use a CSR and Signing Certificate key pair to generate a SEP2 Certificate"""
 
@@ -219,7 +221,11 @@ def generate_device_certificate(
         pem_data = fh.read()
     ca_key = serialization.load_pem_private_key(pem_data, password=None)
     valid_from = datetime.now(tz=tz.UTC)
-    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+
+    if valid_to and valid_to.year != 9999:
+        log.warning("Using a valid to year other than 9999 is a deviation from SEP2")
+    else:
+        valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
 
     policies = [x509.PolicyInformation(oid, None) for oid in policy_oids]
 
@@ -234,7 +240,10 @@ def generate_device_certificate(
     encoder.leave()
     hw_module_name = encoder.output()
 
-    sname = x509.Name("")  # SubjectName should be blank
+    # SubjectName should be blank
+    if subject_name:
+        log.warning("Specifying a SubjectName is a deviation from SEP2")
+    sname = x509.Name(subject_name)
 
     issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
