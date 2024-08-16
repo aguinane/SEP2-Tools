@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -51,7 +52,7 @@ def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
 
 
 @app.command()
-def create_key(key_file: Path | None = None, verbose: bool = False) -> None:
+def create_key(key_file: Optional[Path] = None, verbose: bool = False) -> None:  # noqa: UP007
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 

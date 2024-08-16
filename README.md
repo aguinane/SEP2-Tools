@@ -2,7 +2,11 @@
 
 This library provides some useful functions for working with IEEE 2030.5 (SEP2).
 
+## Install
 
+```sh
+pip install sep2tools
+```
 
 ## Certificate Usage
 
