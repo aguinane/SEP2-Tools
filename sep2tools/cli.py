@@ -60,14 +60,18 @@ def create_key(key_file: Optional[Path] = None, verbose: bool = False) -> None: 
 
 
 @app.command()
-def create_serca(verbose: bool = False, output_dir: Path = DEFAULT_DIR) -> None:
+def create_serca(
+    org_name: str = "Smart Energy",
+    verbose: bool = False,
+    output_dir: Path = DEFAULT_DIR,
+) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
     output_dir.mkdir(exist_ok=True)
     key_file = output_dir / "serca.key"
     key, csr = generate_key(key_file, generate_csr=False)
-    generate_serca(key)
+    generate_serca(key, org_name=org_name)
 
 
 @app.command()
@@ -83,8 +87,8 @@ def create_mica(
 
     output_dir.mkdir(exist_ok=True)
     key_file = output_dir / "mica.key"
-    key, csr = generate_key(key_file, generate_csr=False)
-    generate_mica(ca_cert, ca_key, key)
+    key, csr = generate_key(key_file, generate_csr=True)
+    generate_mica(csr, ca_cert, ca_key, org_name=org_name)
 
 
 @app.command()

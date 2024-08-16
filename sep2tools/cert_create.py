@@ -200,28 +200,29 @@ def generate_serca(
 
 
 def generate_mica(
+    csr_path: Path,
     ca_cert_path: Path,
     ca_key_path: Path,
-    key_file: Path,
     cert_file: Path | None = None,
     org_name: str = "Example Org Name",
     country_name: str = "AU",
+    common_name: str = "IEEE 2030.5 MICA",
     policy_oids: list[ObjectIdentifier] = DEFAULT_MICA_POLICIES,
 ) -> tuple[Path, Path]:
     """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
 
-    if not cert_file:
-        output_dir = key_file.parent
-        output_dir.mkdir(exist_ok=True)
-        if key_file.suffix == "pem":
-            cert_name = f"{key_file.stem}-mica.pem"
-        else:
-            cert_name = f"{key_file.stem}.pem"
-        cert_file = output_dir / cert_name
+    with open(csr_path, "rb") as fh:
+        csr_data = fh.read()
+    csr = x509.load_pem_x509_csr(csr_data)
 
-    with open(key_file, "rb") as fh:
-        pem_data = fh.read()
-    key = serialization.load_pem_private_key(pem_data, password=None)
+    if not cert_file:
+        output_dir = csr_path.parent
+        output_dir.mkdir(exist_ok=True)
+        if csr_path.suffix == "pem":
+            cert_name = f"{csr_path.stem}-mica.pem"
+        else:
+            cert_name = f"{csr_path.stem}.pem"
+        cert_file = output_dir / cert_name
 
     # Load certificate authority
     with open(ca_cert_path, "rb") as fh:
@@ -234,20 +235,20 @@ def generate_mica(
     valid_from = datetime.now(tz=tz.UTC)
     valid_to = INDEF_EXPIRY  # as per standard
 
-    policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
+    policies = [x509.PolicyInformation(oid, None) for oid in policy_oids]
 
     # Define the Subject Name
     subject = x509.Name(
         [
             x509.NameAttribute(NameOID.COUNTRY_NAME, country_name),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
-            x509.NameAttribute(NameOID.COMMON_NAME, "IEEE 2030.5 MICA"),
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
             x509.NameAttribute(NameOID.SERIAL_NUMBER, "1"),
         ]
     )
 
     # Generate a Subject Key Identifier (SKI)
-    ski = key.public_key().public_bytes(
+    ski = csr.public_key().public_bytes(
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
@@ -256,11 +257,14 @@ def generate_mica(
     ski_digest.update(ski)
     ski_value = ski_digest.finalize()
 
+    issuer_name = ca_cert.subject
+    iname = x509.Name(issuer_name)
+
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
-        .issuer_name(subject)
-        .public_key(key.public_key())
+        .issuer_name(iname)
+        .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(valid_from)
         .not_valid_after(valid_to)
@@ -321,7 +325,7 @@ def generate_device_certificate(
     cert_file: Path | None = None,
     policy_oids: list[ObjectIdentifier] = DEFAULT_DEV_POLICIES,
     valid_to: datetime | None = None,
-    subject_name: str = "",
+    common_name: str = "",
 ) -> Path:
     """Use a CSR and Signing Certificate key pair to generate a SEP2 Certificate"""
 
@@ -359,16 +363,22 @@ def generate_device_certificate(
     encoder.leave()
     hw_module_name = encoder.output()
 
-    # SubjectName should be blank
-    if subject_name:
+    # Define the Subject Name
+    if common_name:
         log.warning("Specifying a SubjectName is a deviation from SEP2")
-    sname = x509.Name(subject_name)
+        subject = x509.Name(
+            [
+                x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            ]
+        )
+    else:
+        subject = x509.Name("")
 
     issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
     cert = (
         x509.CertificateBuilder()
-        .subject_name(sname)
+        .subject_name(subject)
         .issuer_name(iname)
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
