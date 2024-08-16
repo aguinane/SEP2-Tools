@@ -16,6 +16,8 @@ log = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = Path("certs")
 
+INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0)  # As per standard
+
 ANY_POLICY_OID = ObjectIdentifier("2.5.29.32.0")  # OID for "X509v3 Any Policy"
 
 # IEEE 2030.5 device type assignments (Section 6.11.7.2)
@@ -126,7 +128,7 @@ def generate_serca(
     key = serialization.load_pem_private_key(pem_data, password=None)
 
     valid_from = datetime.now(tz=tz.UTC)
-    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+    valid_to = INDEF_EXPIRY  # as per standard
 
     policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
 
@@ -230,7 +232,7 @@ def generate_mica(
     ca_key = serialization.load_pem_private_key(pem_data, password=None)
 
     valid_from = datetime.now(tz=tz.UTC)
-    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+    valid_to = INDEF_EXPIRY  # as per standard
 
     policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
 
@@ -342,7 +344,7 @@ def generate_device_certificate(
     if valid_to and valid_to.year != 9999:
         log.warning("Using a valid to year other than 9999 is a deviation from SEP2")
     else:
-        valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+        valid_to = INDEF_EXPIRY  # as per standard
 
     policies = [x509.PolicyInformation(oid, None) for oid in policy_oids]
 
