@@ -17,7 +17,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dynamic = ["version", "description"]
-dependencies = ["cryptography", "asn1", "python-dateutil", "pydantic"]
+dependencies = ["asn1", "cryptography", "pydantic", "python-dateutil", "typer"]
 
 [project.optional-dependencies]
 test = ["ruff", "pytest >=2.7.3", "pytest-cov", "mypy"]
