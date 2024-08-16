@@ -16,6 +16,8 @@ log = logging.getLogger(__name__)
 
 DEFAULT_OUTPUT = Path("certs")
 
+INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0)  # As per standard
+
 ANY_POLICY_OID = ObjectIdentifier("2.5.29.32.0")  # OID for "X509v3 Any Policy"
 
 # IEEE 2030.5 device type assignments (Section 6.11.7.2)
@@ -33,9 +35,14 @@ SEP2_BULK_CERT = ObjectIdentifier("1.3.6.1.4.1.40732.2.4")
 SEP2_HARDWARE_MODULE_NAME = ObjectIdentifier("1.3.6.1.5.5.7.8.4")
 
 
-DEFAULT_POLICIES = [
+DEFAULT_MICA_POLICIES = [
     SEP2_DEV_GENERIC,
-    SEP2_DEV_POSTMANUF,
+    SEP2_TEST_CERT,
+]
+
+
+DEFAULT_DEV_POLICIES = [
+    SEP2_DEV_GENERIC,
     SEP2_TEST_CERT,
     SEP2_SELFSIGNED,
     SEP2_BULK_CERT,
@@ -111,7 +118,7 @@ def generate_serca(
         output_dir = key_file.parent
         output_dir.mkdir(exist_ok=True)
         if key_file.suffix == "pem":
-            cert_name = f"{key_file.stem}-root.pem"
+            cert_name = f"{key_file.stem}-serca.pem"
         else:
             cert_name = f"{key_file.stem}.pem"
         cert_file = output_dir / cert_name
@@ -121,7 +128,7 @@ def generate_serca(
     key = serialization.load_pem_private_key(pem_data, password=None)
 
     valid_from = datetime.now(tz=tz.UTC)
-    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+    valid_to = INDEF_EXPIRY  # as per standard
 
     policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
 
@@ -192,6 +199,119 @@ def generate_serca(
     return cert_file, der_file
 
 
+def generate_mica(
+    ca_cert_path: Path,
+    ca_key_path: Path,
+    key_file: Path,
+    cert_file: Path | None = None,
+    org_name: str = "Example Org Name",
+    country_name: str = "AU",
+    policy_oids: list[ObjectIdentifier] = DEFAULT_MICA_POLICIES,
+) -> tuple[Path, Path]:
+    """Use a CSR and MICA key pair to generate a SEP2 Certificate"""
+
+    if not cert_file:
+        output_dir = key_file.parent
+        output_dir.mkdir(exist_ok=True)
+        if key_file.suffix == "pem":
+            cert_name = f"{key_file.stem}-mica.pem"
+        else:
+            cert_name = f"{key_file.stem}.pem"
+        cert_file = output_dir / cert_name
+
+    with open(key_file, "rb") as fh:
+        pem_data = fh.read()
+    key = serialization.load_pem_private_key(pem_data, password=None)
+
+    # Load certificate authority
+    with open(ca_cert_path, "rb") as fh:
+        ca_pem_data = fh.read()
+    ca_cert = x509.load_pem_x509_certificate(ca_pem_data)
+    with open(ca_key_path, "rb") as fh:
+        pem_data = fh.read()
+    ca_key = serialization.load_pem_private_key(pem_data, password=None)
+
+    valid_from = datetime.now(tz=tz.UTC)
+    valid_to = INDEF_EXPIRY  # as per standard
+
+    policies = [x509.PolicyInformation(ANY_POLICY_OID, None)]
+
+    # Define the Subject Name
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, country_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
+            x509.NameAttribute(NameOID.COMMON_NAME, "IEEE 2030.5 MICA"),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, "1"),
+        ]
+    )
+
+    # Generate a Subject Key Identifier (SKI)
+    ski = key.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    ski_digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+    ski_digest.update(ski)
+    ski_value = ski_digest.finalize()
+
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(valid_from)
+        .not_valid_after(valid_to)
+        .add_extension(
+            x509.BasicConstraints(ca=True, path_length=0),
+            critical=True,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=False,
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier(ski_value),
+            critical=False,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                ca_cert.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier
+                ).value
+            ),
+            critical=False,
+        )
+        .add_extension(
+            x509.CertificatePolicies(policies=policies),
+            critical=True,
+        )
+        .sign(ca_key, SHA256())
+    )
+
+    cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
+    with open(cert_file, "wb") as fh:
+        fh.write(cert_pem)
+        fh.write(ca_pem_data)  # Append the signing certificate
+        log.info("Created MICA %s", cert_file)
+
+    der_file = convert_pem_to_der(cert_file)
+
+    return cert_file, der_file
+
+
 def generate_device_certificate(
     csr_path: Path,
     ca_cert_path: Path,
@@ -199,8 +319,9 @@ def generate_device_certificate(
     pen: int,
     hardware_serial_number: str,
     cert_file: Path | None = None,
-    serca_cert_path: Path | None = None,
-    policy_oids: list[ObjectIdentifier] = DEFAULT_POLICIES,
+    policy_oids: list[ObjectIdentifier] = DEFAULT_DEV_POLICIES,
+    valid_to: datetime | None = None,
+    subject_name: str = "",
 ) -> Path:
     """Use a CSR and Signing Certificate key pair to generate a SEP2 Certificate"""
 
@@ -219,7 +340,11 @@ def generate_device_certificate(
         pem_data = fh.read()
     ca_key = serialization.load_pem_private_key(pem_data, password=None)
     valid_from = datetime.now(tz=tz.UTC)
-    valid_to = datetime(9999, 12, 31, 23, 59, 59, 0)  # as per standard
+
+    if valid_to and valid_to.year != 9999:
+        log.warning("Using a valid to year other than 9999 is a deviation from SEP2")
+    else:
+        valid_to = INDEF_EXPIRY  # as per standard
 
     policies = [x509.PolicyInformation(oid, None) for oid in policy_oids]
 
@@ -234,7 +359,10 @@ def generate_device_certificate(
     encoder.leave()
     hw_module_name = encoder.output()
 
-    sname = x509.Name("")  # SubjectName should be blank
+    # SubjectName should be blank
+    if subject_name:
+        log.warning("Specifying a SubjectName is a deviation from SEP2")
+    sname = x509.Name(subject_name)
 
     issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
@@ -287,18 +415,12 @@ def generate_device_certificate(
         .sign(ca_key, SHA256())
     )
 
-    serca_pem_data = ""
-    if serca_cert_path:
-        with open(serca_cert_path, "rb") as fh:
-            serca_pem_data = fh.read()
-
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
     with open(cert_file, "wb") as fh:
         fh.write(cert_pem)
-        # Append the intermediate certificate
+        # Append the intermediate certificate(s)
         fh.write(ca_pem_data)
-        # Append the root certificate
-        if serca_pem_data:
-            fh.write(serca_pem_data)
         log.info("Created Cert %s", cert_file)
+
+    convert_pem_to_der(cert_file)
     return cert_file

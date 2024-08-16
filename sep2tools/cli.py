@@ -1,15 +1,22 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 import typer
 
-from .cert_create import generate_device_certificate, generate_key, generate_serca
+from .cert_create import (
+    generate_device_certificate,
+    generate_key,
+    generate_mica,
+    generate_serca,
+)
 from .cert_id import get_certificate_lfdi
+from .cert_validate import validate_pem_certificate
 from .version import __version__
 
 LOG_FORMAT = "%(asctime)s %(levelname)-8s %(message)s"
 app = typer.Typer()
-DEFAULT_DIR = Path(".")
+DEFAULT_DIR = Path("certs")
 
 
 def version_callback(value: bool):
@@ -41,23 +48,43 @@ def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
     lfdi = get_certificate_lfdi(filepath)
     typer.echo(f"The LFDI is: {lfdi}")
 
-
-@app.command()
-def create_key(verbose: bool = False) -> None:
-    log_level = "DEBUG" if verbose else "INFO"
-    logging.basicConfig(level=log_level, format=LOG_FORMAT)
-
-    key, csr = generate_key()
+    validate_pem_certificate(filepath)
 
 
 @app.command()
-def create_serca(verbose: bool = False) -> None:
+def create_key(key_file: Optional[Path] = None, verbose: bool = False) -> None:  # noqa: UP007
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
-    key_file = Path("root.key")
+    key, csr = generate_key(key_file)
+
+
+@app.command()
+def create_serca(verbose: bool = False, output_dir: Path = DEFAULT_DIR) -> None:
+    log_level = "DEBUG" if verbose else "INFO"
+    logging.basicConfig(level=log_level, format=LOG_FORMAT)
+
+    output_dir.mkdir(exist_ok=True)
+    key_file = output_dir / "serca.key"
     key, csr = generate_key(key_file, generate_csr=False)
     generate_serca(key)
+
+
+@app.command()
+def create_mica(
+    ca_cert: Path,
+    ca_key: Path,
+    org_name: str = "Example Org",
+    verbose: bool = False,
+    output_dir: Path = DEFAULT_DIR,
+) -> None:
+    log_level = "DEBUG" if verbose else "INFO"
+    logging.basicConfig(level=log_level, format=LOG_FORMAT)
+
+    output_dir.mkdir(exist_ok=True)
+    key_file = output_dir / "mica.key"
+    key, csr = generate_key(key_file, generate_csr=False)
+    generate_mica(ca_cert, ca_key, key)
 
 
 @app.command()
@@ -72,6 +99,8 @@ def create_cert(
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
-    cert_fp = generate_device_certificate(csr_path, ca_cert, ca_key, pen, serno)
+    cert_fp = generate_device_certificate(
+        csr_path, ca_cert, ca_key, pen=pen, hardware_serial_number=serno
+    )
     lfdi = get_certificate_lfdi(cert_fp)
     typer.echo(f"The LFDI is: {lfdi}")

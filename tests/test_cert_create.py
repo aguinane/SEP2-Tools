@@ -9,6 +9,7 @@ from sep2tools.cert_create import (
 from sep2tools.cert_id import (
     get_certificate_lfdi,
 )
+from sep2tools.cert_validate import validate_pem_certificate
 
 EXAMPLE_PEN = 1234
 EXAMPLE_SERNO = "A1234"
@@ -55,6 +56,8 @@ def test_example_cert_lfdi():
         hardware_serial_number=EXAMPLE_SERNO,
         cert_file=dev_fp,
     )
+
+    assert validate_pem_certificate(dev_fp)
 
     dev_der_fp = convert_pem_to_der(dev_fp)
 

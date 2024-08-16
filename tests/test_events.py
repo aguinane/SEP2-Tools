@@ -31,7 +31,7 @@ EXAMPLE_EVENTS = [
         currentStatus=0,
         start=100,
         duration=50,
-        controls=[DERControlBase(mode="opModExpLimW", value=1.5, multiplier=3)],
+        controls=[DERControlBase(mode="opModExpLimW", value=15, multiplier=3)],
         primacy=1,
     ),
     DERControl(
@@ -40,7 +40,7 @@ EXAMPLE_EVENTS = [
         currentStatus=0,
         start=120,
         duration=50,
-        controls=[DERControlBase(mode="opModExpLimW", value=2.0, multiplier=3)],
+        controls=[DERControlBase(mode="opModExpLimW", value=20, multiplier=3)],
         primacy=0,
     ),
     DERControl(
@@ -49,7 +49,7 @@ EXAMPLE_EVENTS = [
         currentStatus=0,
         start=150,
         duration=50,
-        controls=[DERControlBase(mode="opModExpLimW", value=1.5, multiplier=3)],
+        controls=[DERControlBase(mode="opModExpLimW", value=15, multiplier=3)],
         primacy=1,
     ),
     DERControl(
