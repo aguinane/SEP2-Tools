@@ -9,7 +9,8 @@ from .cert_create import (
     generate_mica,
     generate_serca,
 )
-from .cert_id import get_certificate_lfdi, validate_pem_certificate
+from .cert_id import get_certificate_lfdi
+from .cert_validate import validate_pem_certificate
 from .version import __version__
 
 LOG_FORMAT = "%(asctime)s %(levelname)-8s %(message)s"
