@@ -99,7 +99,7 @@ def convert_pem_to_der(pem_file: Path, der_file: Path | None = None) -> Path:
     der_data = cert.public_bytes(encoding=serialization.Encoding.DER)
 
     if not der_file:
-        der_file = pem_file.with_suffix(".der")
+        der_file = pem_file.with_suffix(".cer")
     with open(der_file, "wb") as fh:
         fh.write(der_data)
         log.info("Created %s from %s", der_file, pem_file)
