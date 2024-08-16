@@ -3,17 +3,30 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography import x509
+from cryptography.x509 import Certificate
+
+from .cert_id import is_pem_certificate
 
 log = logging.getLogger(__name__)
 INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0)  # As per standard
 
 
+def load_certificate(cert_path: Path) -> Certificate:
+    if not cert_path.exists():
+        raise ValueError(f"Cert not found at {cert_path}")
+    with open(cert_path, "rb") as pem_file:
+        cert_data = pem_file.read()
+    if is_pem_certificate(cert_path):
+        cert = x509.load_pem_x509_certificate(cert_data)
+    else:
+        cert = x509.load_der_x509_certificate(cert_data)
+    return cert
+
+
 def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
     """Load X.509 DER Certificate in PEM format and return Policy OIDs"""
 
-    with open(cert_path, "rb") as pem_file:
-        cert_data = pem_file.read()
-    cert = x509.load_pem_x509_certificate(cert_data)
+    cert = load_certificate(cert_path)
 
     oids = []
     cert_policies = cert.extensions.get_extension_for_oid(
@@ -28,14 +41,8 @@ def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
 def validate_pem_certificate(cert_path: Path) -> bool:
     """Load X.509 DER Certificate in PEM format and validate"""
 
-    if not cert_path.exists():
-        raise ValueError(f"Cert not found at {cert_path}")
-
-    with open(cert_path, "rb") as pem_file:
-        cert_data = pem_file.read()
-
+    cert = load_certificate(cert_path)
     valid = True
-    cert = x509.load_pem_x509_certificate(cert_data)
 
     # Check the validity period
     current_time = datetime.utcnow()

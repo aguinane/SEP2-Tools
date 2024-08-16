@@ -167,4 +167,5 @@ certs/
 *.key
 *.csr
 *.der
+*.cer
 .vscode
