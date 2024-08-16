@@ -1,11 +1,11 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from cryptography import x509
 
 log = logging.getLogger(__name__)
-INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0)  # As per standard
+INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0, timezone.utc)  # As per standard
 
 
 def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
@@ -38,20 +38,20 @@ def validate_pem_certificate(cert_path: Path) -> bool:
     cert = x509.load_pem_x509_certificate(cert_data)
 
     # Check the validity period
-    current_time = datetime.utcnow()
-    if not cert.not_valid_before <= current_time:
+    current_time_utc = datetime.now(timezone.utc)
+    if not cert.not_valid_before_utc <= current_time_utc:
         msg = "Certificate is not valid yet. "
         msg += "Not valid before {cert.not_valid_before}"
         log.error(msg)
         valid = False
-    if not current_time <= cert.not_valid_after:
+    if not current_time_utc <= cert.not_valid_after_utc:
         msg = "Certificate is no longer valid. "
         msg += "Not valid after {cert.not_valid_after}"
         log.error(msg)
         valid = False
-    if cert.not_valid_after != INDEF_EXPIRY:
+    if cert.not_valid_after_utc != INDEF_EXPIRY:
         msg = f"Certificate expiry not {INDEF_EXPIRY} as per standard. "
-        msg += f"Expires {cert.not_valid_after}"
+        msg += f"Expires {cert.not_valid_after_utc}"
         log.warning(msg)
         valid = False
 
