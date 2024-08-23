@@ -32,6 +32,23 @@ def test_key_creation():
     csr.unlink()  # Delete to cleanup
 
 
+def test_key_creation_with_dns():
+    """Create Private Key and CSR"""
+
+    key, csr = generate_key(hostnames=["www.example.com"])
+
+    with open(key) as fh:
+        lines = fh.readlines()
+        assert lines[0] == "-----BEGIN PRIVATE KEY-----\n"
+
+    with open(csr) as fh:
+        lines = fh.readlines()
+        assert lines[0] == "-----BEGIN CERTIFICATE REQUEST-----\n"
+
+    key.unlink()  # Delete to cleanup
+    csr.unlink()  # Delete to cleanup
+
+
 def test_example_cert_lfdi():
     """Test the LFDI calculation"""
 

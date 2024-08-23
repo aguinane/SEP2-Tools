@@ -52,11 +52,16 @@ def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
 
 
 @app.command()
-def create_key(key_file: Optional[Path] = None, verbose: bool = False) -> None:  # noqa: UP007
+def create_key(
+    key_file: Optional[Path] = None,  # noqa: UP007
+    hostname: str = "",
+    verbose: bool = False,
+) -> None:
     log_level = "DEBUG" if verbose else "INFO"
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
-    key, csr = generate_key(key_file)
+    hostnames = None if not hostname else [hostname]
+    key, csr = generate_key(key_file, generate_csr=True, hostnames=hostnames)
 
 
 @app.command()

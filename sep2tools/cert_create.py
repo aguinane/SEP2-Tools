@@ -9,7 +9,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.hashes import SHA256
-from cryptography.x509.oid import NameOID, ObjectIdentifier
+from cryptography.x509.oid import ExtensionOID, NameOID, ObjectIdentifier
 from dateutil import tz
 
 log = logging.getLogger(__name__)
@@ -54,7 +54,9 @@ def random_id() -> str:
 
 
 def generate_key(
-    key_file: Path | None = None, generate_csr: bool = True
+    key_file: Path | None = None,
+    generate_csr: bool = True,
+    hostnames: list[str] | None = None,
 ) -> tuple[Path, Path | None]:
     """Generate a Private Key and Certificate Signing Request (CSR)"""
 
@@ -78,11 +80,26 @@ def generate_key(
     if generate_csr:
         csr_file = key_file.with_suffix(".csr")
         subject_name = ""
-        csr = (
-            x509.CertificateSigningRequestBuilder()
-            .subject_name(x509.Name(subject_name))
-            .sign(key, SHA256())
-        )
+
+        # Subject Alternative Names (SANs)
+        san_list = []
+        if hostnames:
+            msg = "Note that SEP2 Certificates do not require a hostname"
+            log.warning(msg)
+            for name in hostnames:
+                san = x509.DNSName(name)
+                san_list.append(san)
+
+        cb = x509.CertificateSigningRequestBuilder()
+        cb = cb.subject_name(x509.Name(subject_name))
+        if hostnames:
+            cb = cb.add_extension(
+                x509.SubjectAlternativeName(san_list),
+                critical=False,
+            )
+
+        csr = cb.sign(key, SHA256())
+
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
         with open(csr_file, "wb") as fh:
             fh.write(csr_pem)
@@ -152,42 +169,40 @@ def generate_serca(
     ski_digest.update(ski)
     ski_value = ski_digest.finalize()
 
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(subject)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(valid_from)
-        .not_valid_after(valid_to)
-        .add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
-            critical=True,
-        )
-        .add_extension(
-            x509.KeyUsage(
-                key_agreement=False,
-                key_cert_sign=True,
-                crl_sign=True,
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.SubjectKeyIdentifier(ski_value),
-            critical=False,
-        )
-        .add_extension(
-            x509.CertificatePolicies(policies=policies),
-            critical=True,
-        )
-        .sign(key, SHA256())
+    cb = x509.CertificateBuilder()
+    cb = cb.subject_name(subject)
+    cb = cb.issuer_name(subject)
+    cb = cb.public_key(key.public_key())
+    cb = cb.serial_number(x509.random_serial_number())
+    cb = cb.not_valid_before(valid_from)
+    cb = cb.not_valid_after(valid_to)
+    cb = cb.add_extension(
+        x509.BasicConstraints(ca=True, path_length=None),
+        critical=True,
     )
+    cb = cb.add_extension(
+        x509.KeyUsage(
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=True,
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    cb = cb.add_extension(
+        x509.SubjectKeyIdentifier(ski_value),
+        critical=False,
+    )
+    cb = cb.add_extension(
+        x509.CertificatePolicies(policies=policies),
+        critical=True,
+    )
+    cert = cb.sign(key, SHA256())
 
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
     with open(cert_file, "wb") as fh:
@@ -260,50 +275,47 @@ def generate_mica(
     issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
 
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(iname)
-        .public_key(csr.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(valid_from)
-        .not_valid_after(valid_to)
-        .add_extension(
-            x509.BasicConstraints(ca=True, path_length=0),
-            critical=True,
-        )
-        .add_extension(
-            x509.KeyUsage(
-                key_agreement=False,
-                key_cert_sign=True,
-                crl_sign=False,
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.SubjectKeyIdentifier(ski_value),
-            critical=False,
-        )
-        .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-                ca_cert.extensions.get_extension_for_class(
-                    x509.SubjectKeyIdentifier
-                ).value
-            ),
-            critical=False,
-        )
-        .add_extension(
-            x509.CertificatePolicies(policies=policies),
-            critical=True,
-        )
-        .sign(ca_key, SHA256())
+    cb = x509.CertificateBuilder()
+
+    cb = cb.subject_name(subject)
+    cb = cb.issuer_name(iname)
+    cb = cb.public_key(csr.public_key())
+    cb = cb.serial_number(x509.random_serial_number())
+    cb = cb.not_valid_before(valid_from)
+    cb = cb.not_valid_after(valid_to)
+    cb = cb.add_extension(
+        x509.BasicConstraints(ca=True, path_length=0),
+        critical=True,
     )
+    cb = cb.add_extension(
+        x509.KeyUsage(
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=False,
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    cb = cb.add_extension(
+        x509.SubjectKeyIdentifier(ski_value),
+        critical=False,
+    )
+    cb = cb.add_extension(
+        x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+            ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+        ),
+        critical=False,
+    )
+    cb = cb.add_extension(
+        x509.CertificatePolicies(policies=policies),
+        critical=True,
+    )
+    cert = cb.sign(ca_key, SHA256())
 
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
     with open(cert_file, "wb") as fh:
@@ -325,7 +337,6 @@ def generate_device_certificate(
     cert_file: Path | None = None,
     policy_oids: list[ObjectIdentifier] = DEFAULT_DEV_POLICIES,
     valid_to: datetime | None = None,
-    common_name: str = "",
 ) -> Path:
     """Use a CSR and Signing Certificate key pair to generate a SEP2 Certificate"""
 
@@ -362,68 +373,66 @@ def generate_device_certificate(
     encoder.write(str(hardware_serial_number), asn1.Numbers.OctetString)
     encoder.leave()
     hw_module_name = encoder.output()
+    hw_other_name = x509.OtherName(SEP2_HARDWARE_MODULE_NAME, hw_module_name)
+
+    # Load Subject Alt Names from CSR if they exist
+    sans = [hw_other_name]
+    try:
+        san_oid = ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+        san_extension = csr.extensions.get_extension_for_oid(san_oid)
+        san = san_extension.value
+        log.warning("Specifying a SubjectAlternativeName is a deviation from SEP2")
+        sans.extend(san)
+    except x509.ExtensionNotFound:
+        pass
 
     # Define the Subject Name
-    if common_name:
-        log.warning("Specifying a SubjectName is a deviation from SEP2")
-        subject = x509.Name(
-            [
-                x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-            ]
-        )
-    else:
-        subject = x509.Name("")
+    subject = x509.Name("")
 
     issuer_name = ca_cert.subject
     iname = x509.Name(issuer_name)
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject)
-        .issuer_name(iname)
-        .public_key(csr.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(valid_from)
-        .not_valid_after(valid_to)
-        .add_extension(
-            x509.BasicConstraints(ca=False, path_length=None),
-            critical=True,
-        )
-        .add_extension(
-            x509.KeyUsage(
-                key_agreement=True,
-                key_cert_sign=False,
-                crl_sign=False,
-                digital_signature=True,
-                content_commitment=False,
-                key_encipherment=False,
-                data_encipherment=False,
-                encipher_only=False,
-                decipher_only=False,
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-                ca_cert.extensions.get_extension_for_class(
-                    x509.SubjectKeyIdentifier
-                ).value
-            ),
-            critical=False,
-        )
-        .add_extension(
-            x509.SubjectAlternativeName(
-                general_names=[
-                    x509.OtherName(SEP2_HARDWARE_MODULE_NAME, hw_module_name)
-                ]
-            ),
-            critical=True,
-        )
-        .add_extension(
-            x509.CertificatePolicies(policies=policies),
-            critical=True,
-        )
-        .sign(ca_key, SHA256())
+
+    cb = x509.CertificateBuilder()
+    cb = cb.subject_name(subject)
+    cb = cb.issuer_name(iname)
+    cb = cb.public_key(csr.public_key())
+    cb = cb.serial_number(x509.random_serial_number())
+    cb = cb.not_valid_before(valid_from)
+    cb = cb.not_valid_after(valid_to)
+    cb = cb.add_extension(
+        x509.BasicConstraints(ca=False, path_length=None),
+        critical=True,
     )
+    cb = cb.add_extension(
+        x509.KeyUsage(
+            key_agreement=True,
+            key_cert_sign=False,
+            crl_sign=False,
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            encipher_only=False,
+            decipher_only=False,
+        ),
+        critical=True,
+    )
+    cb = cb.add_extension(
+        x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+            ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+        ),
+        critical=False,
+    )
+    cb = cb.add_extension(
+        x509.CertificatePolicies(policies=policies),
+        critical=True,
+    )
+    cb = cb.add_extension(
+        x509.SubjectAlternativeName(general_names=sans),
+        critical=True,
+    )
+
+    cert = cb.sign(ca_key, SHA256())
 
     cert_pem = cert.public_bytes(encoding=serialization.Encoding.PEM)
     with open(cert_file, "wb") as fh:
