@@ -4,7 +4,6 @@ from pathlib import Path
 
 from cryptography import x509
 from cryptography.x509 import Certificate
-from dateutil import tz
 
 from .cert_id import is_pem_certificate
 
@@ -24,7 +23,7 @@ def load_certificate(cert_path: Path) -> Certificate:
     return cert
 
 
-def get_pem_certificate_sans(cert_path: Path) -> list[str]:
+def get_certificate_sans(cert_path: Path) -> list[str]:
     """Load X.509 DER Certificate in PEM format and return Policy OIDs"""
     cert = load_certificate(cert_path)
     sans = cert.extensions.get_extension_for_oid(
@@ -40,7 +39,7 @@ def get_pem_certificate_sans(cert_path: Path) -> list[str]:
     return output
 
 
-def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
+def get_certificate_policy_oids(cert_path: Path) -> list[str]:
     """Load X.509 DER Certificate in PEM format and return Policy OIDs"""
 
     cert = load_certificate(cert_path)
@@ -55,7 +54,7 @@ def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
     return oids
 
 
-def validate_pem_certificate(cert_path: Path) -> bool:
+def validate_certificate(cert_path: Path) -> bool:
     """Load X.509 DER Certificate in PEM format and validate"""
 
     cert = load_certificate(cert_path)
@@ -82,7 +81,7 @@ def validate_pem_certificate(cert_path: Path) -> bool:
     # Verify the OIDs
     sep2_dev_type = False
     dev_oid_start = "1.3.6.1.4.1.40732.1."
-    oids = get_pem_certificate_policy_oids(cert_path)
+    oids = get_certificate_policy_oids(cert_path)
     for oid in oids:
         if dev_oid_start in oid:
             sep2_dev_type = True

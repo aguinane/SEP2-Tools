@@ -20,7 +20,7 @@ dynamic = ["version", "description"]
 dependencies = ["asn1", "cryptography", "pydantic", "python-dateutil", "typer"]
 
 [project.optional-dependencies]
-test = ["ruff", "pytest >=2.7.3", "pytest-cov", "mypy"]
+test = ["ruff", "pytest>=2.7.3", "pytest-cov", "mypy"]
 
 [project.scripts]
 sep2tools = "sep2tools.cli:app"
@@ -40,5 +40,5 @@ skip_empty = true
 fail_under = 80
 
 [tool.ruff.lint]
-select = ["A", "B", "E", "F", "I", "N", "SIM", "UP"]
+select = ["A", "B", "E", "F", "I", "N", "PERF", "RUF", "SIM", "UP"]
 ignore = ['N815']

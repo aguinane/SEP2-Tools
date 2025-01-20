@@ -11,7 +11,7 @@ from .cert_create import (
     generate_serca,
 )
 from .cert_id import get_certificate_lfdi
-from .cert_validate import validate_pem_certificate
+from .cert_validate import validate_certificate
 from .version import __version__
 
 LOG_FORMAT = "%(asctime)s %(levelname)-8s %(message)s"
@@ -48,7 +48,7 @@ def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
     lfdi = get_certificate_lfdi(filepath)
     typer.echo(f"The LFDI is: {lfdi}")
 
-    validate_pem_certificate(filepath)
+    validate_certificate(filepath)
 
 
 @app.command()
