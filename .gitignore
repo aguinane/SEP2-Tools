@@ -169,3 +169,5 @@ certs/
 *.der
 *.cer
 .vscode
+uv.lock
+!example-certs/*

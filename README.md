@@ -11,7 +11,7 @@ pip install sep2tools
 ## Certificate Creation
 
 
-Note the below CLI commands are only approproiate for testing purposes.
+Note the below CLI commands are only appropriate for testing purposes.
 For production certificates, use the actual functions to set appropriate policies and settings.
 
 

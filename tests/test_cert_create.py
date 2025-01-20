@@ -9,7 +9,7 @@ from sep2tools.cert_create import (
 from sep2tools.cert_id import (
     get_certificate_lfdi,
 )
-from sep2tools.cert_validate import validate_pem_certificate
+from sep2tools.cert_validate import validate_certificate
 
 EXAMPLE_PEN = 1234
 EXAMPLE_SERNO = "A1234"
@@ -19,6 +19,23 @@ def test_key_creation():
     """Create Private Key and CSR"""
 
     key, csr = generate_key()
+
+    with open(key) as fh:
+        lines = fh.readlines()
+        assert lines[0] == "-----BEGIN PRIVATE KEY-----\n"
+
+    with open(csr) as fh:
+        lines = fh.readlines()
+        assert lines[0] == "-----BEGIN CERTIFICATE REQUEST-----\n"
+
+    key.unlink()  # Delete to cleanup
+    csr.unlink()  # Delete to cleanup
+
+
+def test_key_creation_with_dns():
+    """Create Private Key and CSR"""
+
+    key, csr = generate_key(hostnames=["www.example.com"])
 
     with open(key) as fh:
         lines = fh.readlines()
@@ -57,7 +74,7 @@ def test_example_cert_lfdi():
         cert_file=dev_fp,
     )
 
-    assert validate_pem_certificate(dev_fp)
+    assert validate_certificate(dev_fp)
 
     dev_der_fp = convert_pem_to_der(dev_fp)
 

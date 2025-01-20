@@ -23,7 +23,23 @@ def load_certificate(cert_path: Path) -> Certificate:
     return cert
 
 
-def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
+def get_certificate_sans(cert_path: Path) -> list[str]:
+    """Load X.509 DER Certificate in PEM format and return Policy OIDs"""
+    cert = load_certificate(cert_path)
+    sans = cert.extensions.get_extension_for_oid(
+        x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+    ).value
+    output = []
+    for entry in sans:
+        if isinstance(entry, x509.DNSName):
+            output.append(("DNS", entry.value))
+        elif isinstance(entry, x509.OtherName):
+            oid = entry.type_id.dotted_string
+            output.append((oid, entry.value))
+    return output
+
+
+def get_certificate_policy_oids(cert_path: Path) -> list[str]:
     """Load X.509 DER Certificate in PEM format and return Policy OIDs"""
 
     cert = load_certificate(cert_path)
@@ -38,7 +54,7 @@ def get_pem_certificate_policy_oids(cert_path: Path) -> list[str]:
     return oids
 
 
-def validate_pem_certificate(cert_path: Path) -> bool:
+def validate_certificate(cert_path: Path) -> bool:
     """Load X.509 DER Certificate in PEM format and validate"""
 
     cert = load_certificate(cert_path)
@@ -48,12 +64,12 @@ def validate_pem_certificate(cert_path: Path) -> bool:
     current_time_utc = datetime.now(timezone.utc)
     if not cert.not_valid_before_utc <= current_time_utc:
         msg = "Certificate is not valid yet. "
-        msg += "Not valid before {cert.not_valid_before}"
+        msg += "Not valid before {cert.not_valid_before_utc}"
         log.error(msg)
         valid = False
     if not current_time_utc <= cert.not_valid_after_utc:
         msg = "Certificate is no longer valid. "
-        msg += "Not valid after {cert.not_valid_after}"
+        msg += "Not valid after {cert.not_valid_after_utc}"
         log.error(msg)
         valid = False
     if cert.not_valid_after_utc != INDEF_EXPIRY:
@@ -65,7 +81,7 @@ def validate_pem_certificate(cert_path: Path) -> bool:
     # Verify the OIDs
     sep2_dev_type = False
     dev_oid_start = "1.3.6.1.4.1.40732.1."
-    oids = get_pem_certificate_policy_oids(cert_path)
+    oids = get_certificate_policy_oids(cert_path)
     for oid in oids:
         if dev_oid_start in oid:
             sep2_dev_type = True
