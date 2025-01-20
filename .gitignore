@@ -170,3 +170,4 @@ certs/
 *.cer
 .vscode
 uv.lock
+!example-certs/*

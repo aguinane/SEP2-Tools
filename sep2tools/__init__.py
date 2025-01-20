@@ -6,7 +6,7 @@ from .version import __version__
 
 __all__ = [
     "__version__",
+    "generate_mrid",
     "get_certificate_lfdi",
     "proxy_device_lfdi",
-    "generate_mrid",
 ]
