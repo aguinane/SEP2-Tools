@@ -66,7 +66,7 @@ def generate_key(
         name = random_id()
         key_file = output_dir / f"{name}.key"
 
-    key = ec.generate_private_key(ec.SECP256R1)
+    key = ec.generate_private_key(ec.SECP256R1())
     key_pem = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,

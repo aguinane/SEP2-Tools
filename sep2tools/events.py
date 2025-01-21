@@ -1,52 +1,4 @@
-from enum import IntEnum
-
-from pydantic import BaseModel
-
-
-class CurrentStatus(IntEnum):
-    Scheduled = 0
-    Active = 1
-    Cancelled = 2
-    CancelledWithRadomization = 3
-    Superseded = 4
-
-
-class Status(IntEnum):
-    EventReceived = 1
-    EventStarted = 2
-    EventCompleted = 3
-    Superseded = 4
-    EventCancelled = 6
-    EventSuperseded = 7
-
-
-class DERControlBase(BaseModel):
-    mode: str
-    value: int
-    multiplier: int = 0
-
-
-class DERControl(BaseModel):
-    mRID: str
-    creationTime: int
-    currentStatus: CurrentStatus
-    start: int
-    duration: int
-    randomizeStart: int = 0
-    randomizeDuration: int = 0
-    controls: list[DERControlBase]
-    primacy: int
-
-
-class ModeEvent(BaseModel):
-    mrid: str
-    primacy: int
-    creation_time: int
-    start: int
-    end: int
-    value: int
-    rand_start: int
-    rand_dur: int
+from .models import DERControl, ModeEvent
 
 
 def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -131,8 +83,8 @@ def condense_events(events: list[DERControl]) -> dict[str, list[ModeEvent]]:
         mrid = evt.mRID
         primacy = evt.primacy
         creation_time = evt.creationTime
-        start = evt.start
-        end = evt.start + evt.duration
+        start = evt.interval.start
+        end = evt.interval.start + evt.interval.duration
         rand_start = evt.randomizeStart
         rand_dur = evt.randomizeDuration
         for cntrl in evt.controls:
