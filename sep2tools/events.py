@@ -81,7 +81,7 @@ def condense_events(events: list[DERControl]) -> dict[str, list[ModeEvent]]:
     schedule = {}
     for evt in events:
         mrid = evt.mRID
-        primacy = evt.primacy
+        primacy = evt.ProgramInfo.primacy
         creation_time = evt.creationTime
         start = evt.interval.start
         end = evt.interval.start + evt.interval.duration

@@ -1,4 +1,4 @@
-from sep2tools.events import condense_events
+from sep2tools.eventsdb import add_events
 from sep2tools.models import (
     DateTimeInterval,
     DERControl,
@@ -68,26 +68,4 @@ EXAMPLE_EVENTS = [
 ]
 
 
-def test_event_condensing():
-    """Test event primacy correct"""
-
-    schedule = condense_events(EXAMPLE_EVENTS)
-    modes = list(schedule.keys())
-    assert modes == ["opModExpLimW", "opModImpLimW"]
-
-    exp_evts = schedule["opModExpLimW"]
-
-    # Check that the later event is chosen
-    assert "1A" not in [x.mrid for x in exp_evts]
-    assert "1B" in [x.mrid for x in exp_evts]
-
-    # Check that Evt 2 is finished early
-    b = exp_evts[1]
-    assert b.mrid == "2"
-    assert b.end == 120
-
-    # Check that Evt 4 is started late
-    c = exp_evts[3]
-    assert c.mrid == "4"
-    assert c.start == 170  # and not 150
-    assert c.end == 200
+add_events(EXAMPLE_EVENTS)

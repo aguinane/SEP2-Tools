@@ -36,6 +36,11 @@ class DERControlBase(BaseModel):
     multiplier: int = 0
 
 
+class ProgramInfo(BaseModel):
+    program: str = ""
+    primacy: int
+
+
 class DERControl(BaseModel):
     mRID: str
     creationTime: int
@@ -44,7 +49,7 @@ class DERControl(BaseModel):
     randomizeStart: int = 0
     randomizeDuration: int = 0
     controls: list[DERControlBase]
-    primacy: int
+    ProgramInfo: ProgramInfo
 
 
 class ModeEvent(BaseModel):
