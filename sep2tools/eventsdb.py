@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlite_utils import Database
@@ -51,3 +52,15 @@ def add_events(events: list[DERControl], output_dir: Path = DEFAULT_OUTPUT_DIR):
         for evt in events
     ]
     db["events"].insert_all(records, replace=True)
+
+
+def clear_old_events(output_dir: Path = DEFAULT_OUTPUT_DIR, days_to_keep: float = 3.0):
+    output_path = output_dir / "events.db"
+    create_db()
+
+    sql = "DELETE FROM events WHERE (start + duration) < :expire"
+    now_utc = int(datetime.now(timezone.utc).timestamp())
+    db = Database(output_path)
+    with db.conn:
+        db.execute(sql, {"expire": now_utc})
+    db.vacuum()
