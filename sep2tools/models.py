@@ -7,7 +7,7 @@ class CurrentStatus(IntEnum):
     Scheduled = 0
     Active = 1
     Cancelled = 2
-    CancelledWithRadomization = 3
+    CancelledWithRandomization = 3
     Superseded = 4
 
 

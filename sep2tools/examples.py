@@ -23,7 +23,7 @@ def example_control(
     evt = DERControl(
         mRID=mrid,
         creationTime=creation_time,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=0),  # Scheduled
         interval=DateTimeInterval(start=start, duration=duration),
         randomizeStart=10,
         controls=[
@@ -31,6 +31,38 @@ def example_control(
             DERControlBase(mode="csipaus:opModImpLimW", value=imp_limit),
         ],
         ProgramInfo=ProgramInfo(program=program, primacy=primacy),
+    )
+    return evt
+
+
+def example_default_control(
+    program: str = "EXAMPLEPRG", primacy: int = 1
+) -> DERControl:
+    # Max Primacy is 255
+    # set the default above this so that default controls are always after events
+    # but still have correct order if multiple defaults
+    default_primacy = 256 + primacy
+    mrid = generate_mrid(0, group=False)
+    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
+    creation_time = int(now_utc.timestamp())
+    # A default starts when it is created
+    start = creation_time
+    # If replaced the new one will have a newer creation time and supersede
+    # So set end to way in future
+    duration = 999999999
+    exp_limit = 1500
+    imp_limit = 1500
+    evt = DERControl(
+        mRID=mrid,
+        creationTime=creation_time,
+        EventStatus=EventStatus(currentStatus=1),  # Active
+        interval=DateTimeInterval(start=start, duration=duration),
+        randomizeStart=10,
+        controls=[
+            DERControlBase(mode="csipaus:opModExpLimW", value=exp_limit),
+            DERControlBase(mode="csipaus:opModImpLimW", value=imp_limit),
+        ],
+        ProgramInfo=ProgramInfo(program=program, primacy=default_primacy),
     )
     return evt
 
