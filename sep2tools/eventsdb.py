@@ -43,7 +43,7 @@ MODE_EVENT_COLS = {
     "value": int,
     "creation_time": int,
     "rand_start": int,
-    "rand_duration": int,
+    "rand_dur": int,
     "mrid": str,
     "primacy": int,
 }
@@ -123,6 +123,7 @@ def add_events(events: list[DERControl]):
 
 
 def update_mode_events():
+    update_old_default_events()  # Should reduce conflicts
     clear_mode_events()
     enrolments = get_enrolments()
     for der, programs in enrolments.items():
@@ -152,7 +153,7 @@ def add_mode_events(
             "value": evt.value,
             "creation_time": evt.creation_time,
             "rand_start": evt.rand_start,
-            "rand_duration": evt.rand_dur,
+            "rand_dur": evt.rand_dur,
             "mrid": evt.mrid,
             "primacy": evt.primacy,
         }
@@ -214,12 +215,63 @@ def get_events(program: str) -> list[DERControl]:
     return events
 
 
+def get_programs() -> list[str]:
+    sql = "SELECT DISTINCT program FROM events ORDER BY program"
+    db_path = create_db()
+    db = Database(db_path)
+    res = db.query(sql)
+    return [x["program"] for x in res]
+
+
+def get_modes(der: str) -> list[str]:
+    sql = "SELECT DISTINCT mode FROM mode_events WHERE der = :der ORDER BY 1"
+    db_path = create_db()
+    db = Database(db_path)
+    res = db.query(sql, {"der": der})
+    return [x["mode"] for x in res]
+
+
+def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
+    sql = "SELECT * FROM mode_events WHERE der = :der and mode = :mode ORDER BY start"
+    db_path = create_db()
+    db = Database(db_path)
+    events = []
+    with db.conn:
+        res = db.query(sql, {"der": der, "mode": mode})
+        for x in res:
+            item = ModeEvent(**x)
+            events.append(item)
+    return events
+
+
 def clear_mode_events():
     sql = "DELETE FROM mode_events"
     db_path = EVENTS_DB
     db = Database(db_path)
     with db.conn:
         db.execute(sql)
+
+
+def update_old_default_events():
+    """Default events can not be cancelled so modify duration"""
+    db_path = create_db()
+    sql = """SELECT * FROM events WHERE duration = 999999999 AND primacy > 255
+    AND program = :program ORDER BY start DESC"""
+    db = Database(db_path)
+
+    for program in get_programs():
+        with db.conn:
+            res = list(db.query(sql, {"program": program}))
+            for i, evt in enumerate(res):
+                if i == 0:
+                    continue  # Do nothing with most recent default event
+
+                mrid = evt["mRID"]
+                start = evt["start"]
+                prev_start = res[i - 1]["start"]
+                new_duration = prev_start - start
+                update_sql = "UPDATE events SET duration = :duration WHERE mRID = :mrid"
+                db.execute(update_sql, {"mrid": mrid, "duration": new_duration})
 
 
 def clear_old_events(days_to_keep: float = 3.0):
