@@ -278,7 +278,9 @@ def clear_old_events(days_to_keep: float = 3.0):
     db_path = create_db()
     sql = "DELETE FROM events WHERE (start + duration) < :expire"
     now_utc = int(datetime.now(timezone.utc).timestamp())
+    seconds_to_keep = int(days_to_keep * 86400)
+    expire = now_utc - seconds_to_keep
     db = Database(db_path)
     with db.conn:
-        db.execute(sql, {"expire": now_utc})
+        db.execute(sql, {"expire": expire})
     db.vacuum()
