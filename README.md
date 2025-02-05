@@ -37,3 +37,29 @@ Get the LFDI for a certificate. It will also do some validation checks.
 ```sh
 python -m sep2tools cert-lfdi certs/dev-ABC-cert.pem
 ```
+
+
+## Helper Functions
+
+
+### Generating IDs
+
+```python
+from sep2tools.ids import generate_mrid
+
+EXAMPLE_PEN = 1234
+mrid = generate_mrid(EXAMPLE_PEN)
+print(mrid)  # 2726-D70C-C6C2-40DB-B78E-9B38-0000-1234
+```
+
+### Bitmap Hex Mappings
+
+Some helper functions are provided for calculating the hex representation of SEP2 bitmap fields.
+
+```python
+from sep2tools.hexmaps import get_role_flag
+
+binval, hexval = get_role_flag(is_mirror=1, is_der=1, is_submeter=1)
+print(binval)  # 0000000001001001
+print(hexval)  # 0049
+```

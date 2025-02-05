@@ -171,3 +171,4 @@ certs/
 .vscode
 uv.lock
 !example-certs/*
+*.db
