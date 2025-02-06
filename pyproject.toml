@@ -20,10 +20,11 @@ dynamic = ["version", "description"]
 dependencies = [
     "asn1",
     "cryptography",
+    "pandas",
     "pydantic",
     "python-dateutil",
+    "sqlite_utils",
     "typer",
-    'sqlite_utils',
 ]
 
 [project.optional-dependencies]
