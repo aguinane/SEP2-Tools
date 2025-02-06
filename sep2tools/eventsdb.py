@@ -86,6 +86,19 @@ def add_enrolment(der: str, program: str):
     db["enrolments"].insert(item, replace=True)
 
 
+def get_ders() -> set[str]:
+    db_path = create_db()
+    db = Database(db_path)
+    sql = "SELECT DISTINCT der FROM enrolments ORDER BY der"
+    ders = set()
+    with db.conn:
+        res = db.query(sql)
+        for x in res:
+            der = x["der"]
+            ders.add(der)
+    return ders
+
+
 def get_enrolments() -> dict[str, list[str]]:
     db_path = create_db()
     db = Database(db_path)

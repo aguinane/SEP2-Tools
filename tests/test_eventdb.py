@@ -2,10 +2,26 @@ from sep2tools.eventsdb import (
     add_events,
     clear_old_events,
     delete_event,
+    get_day_mode_events,
+    get_ders,
     get_event,
+    get_modes,
     update_mode_events,
 )
 from sep2tools.examples import example_controls, example_default_control
+from sep2tools.times import current_date
+
+
+def test_todays_events():
+    """Test events for today have correct seconds"""
+    today = current_date()
+    for der in get_ders():
+        for mode in get_modes(der):
+            num_seconds = 0
+            for evt in get_day_mode_events(der, mode, today):
+                duration = evt.end - evt.start
+                num_seconds += duration
+            assert num_seconds == 86400
 
 
 def test_event_creation():
