@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from sqlite_utils import Database
@@ -13,6 +13,7 @@ from .models import (
     ModeEvent,
     ProgramInfo,
 )
+from .times import day_time_range
 
 DEFAULT_EVENTS_DB_DIR = Path("")
 EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
@@ -240,6 +241,28 @@ def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
         res = db.query(sql, {"der": der, "mode": mode})
         for x in res:
             item = ModeEvent(**x)
+            events.append(item)
+    return events
+
+
+def get_day_mode_events(der: str, mode: str, day: date) -> list[ModeEvent]:
+    start, end = day_time_range(day)
+    sql = """SELECT * FROM mode_events 
+    WHERE der = :der and mode = :mode 
+    AND (start >= :start OR end >= :start)
+    AND (end <= :end OR start <= :end)
+    ORDER BY start"""
+    db_path = create_db()
+    db = Database(db_path)
+    events = []
+    with db.conn:
+        res = db.query(sql, {"der": der, "mode": mode, "start": start, "end": end})
+        for x in res:
+            item = ModeEvent(**x)
+            if item.start < start:
+                item.start = start
+            if item.end > end:
+                item.end = end
             events.append(item)
     return events
 
