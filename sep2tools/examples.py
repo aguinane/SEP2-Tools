@@ -67,12 +67,12 @@ def example_default_control(
     return evt
 
 
-def example_controls(num: int = 6) -> list[DERControl]:
+def example_controls(program: str = "EXAMPLEPRG", num: int = 6) -> list[DERControl]:
     events = []
     start = next_interval(5)
     duration = 300
     for _ in range(0, num):
-        evt = example_control(start, duration)
+        evt = example_control(start, duration, program=program)
         events.append(evt)
         start = start + duration
     return events

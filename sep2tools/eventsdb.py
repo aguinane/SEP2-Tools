@@ -14,8 +14,9 @@ from .models import (
     ProgramInfo,
 )
 
-DEFAULT_OUTPUT_DIR = Path("")
-
+DEFAULT_EVENTS_DB_DIR = Path("")
+EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
+EVENTS_DB = EVENTS_DB_DIR / "events.db"
 EVENT_COLS = {
     "mRID": str,
     "creationTime": int,
@@ -42,17 +43,16 @@ MODE_EVENT_COLS = {
     "value": int,
     "creation_time": int,
     "rand_start": int,
-    "rand_duration": int,
+    "rand_dur": int,
     "mrid": str,
     "primacy": int,
 }
 
 
-def create_db(output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
-    output_path = output_dir / "events.db"
-    if output_path.exists():
-        return output_path
-    db = Database(output_path, strict=True)
+def create_db() -> Path:
+    if EVENTS_DB.exists():
+        return EVENTS_DB
+    db = Database(EVENTS_DB, strict=True)
     events = db["events"]
     events.create(
         EVENT_COLS,
@@ -75,21 +75,19 @@ def create_db(output_dir: Path = DEFAULT_OUTPUT_DIR) -> Path:
         if_not_exists=True,
     )
 
-    return output_path
+    return EVENTS_DB
 
 
-def add_enrolment(der: str, program: str, output_dir: Path = DEFAULT_OUTPUT_DIR):
-    output_path = output_dir / "events.db"
-    create_db()
+def add_enrolment(der: str, program: str):
+    db_path = create_db()
     item = {"der": der, "program": program}
-    db = Database(output_path)
+    db = Database(db_path)
     db["enrolments"].insert(item, replace=True)
 
 
-def get_enrolments(output_dir: Path = DEFAULT_OUTPUT_DIR) -> dict[str, list[str]]:
-    output_path = output_dir / "events.db"
-    create_db()
-    db = Database(output_path)
+def get_enrolments() -> dict[str, list[str]]:
+    db_path = create_db()
+    db = Database(db_path)
     sql = "SELECT der, program FROM enrolments ORDER BY der, program"
     ders = {}
     with db.conn:
@@ -103,10 +101,9 @@ def get_enrolments(output_dir: Path = DEFAULT_OUTPUT_DIR) -> dict[str, list[str]
     return ders
 
 
-def add_events(events: list[DERControl], output_dir: Path = DEFAULT_OUTPUT_DIR):
-    output_path = output_dir / "events.db"
-    create_db()
-    db = Database(output_path)
+def add_events(events: list[DERControl]):
+    db_path = create_db()
+    db = Database(db_path)
     records = [
         {
             "mRID": evt.mRID,
@@ -124,30 +121,29 @@ def add_events(events: list[DERControl], output_dir: Path = DEFAULT_OUTPUT_DIR):
     ]
     db["events"].insert_all(records, replace=True)
 
-    # Trigger update of mode events calculation
-    update_mode_events(output_dir=output_dir)
 
-
-def update_mode_events(output_dir: Path = DEFAULT_OUTPUT_DIR):
-    clear_mode_events(output_dir=output_dir)
-    enrolments = get_enrolments(output_dir=output_dir)
+def update_mode_events():
+    update_old_default_events()  # Should reduce conflicts
+    clear_mode_events()
+    enrolments = get_enrolments()
     for der, programs in enrolments.items():
         raw_events = []
         for prg in programs:
-            prg_events = get_events(prg, output_dir=output_dir)
+            prg_events = get_events(prg)
             raw_events.extend(prg_events)
 
         clean_events = condense_events(raw_events)
         for mode, events in clean_events.items():
-            add_mode_events(der, mode, events, output_dir=output_dir)
+            add_mode_events(der, mode, events)
 
 
 def add_mode_events(
-    der: str, mode: str, events: list[ModeEvent], output_dir: Path = DEFAULT_OUTPUT_DIR
+    der: str,
+    mode: str,
+    events: list[ModeEvent],
 ):
-    output_path = output_dir / "events.db"
-    create_db()
-    db = Database(output_path)
+    db_path = create_db()
+    db = Database(db_path)
     records = [
         {
             "der": der,
@@ -157,7 +153,7 @@ def add_mode_events(
             "value": evt.value,
             "creation_time": evt.creation_time,
             "rand_start": evt.rand_start,
-            "rand_duration": evt.rand_dur,
+            "rand_dur": evt.rand_dur,
             "mrid": evt.mrid,
             "primacy": evt.primacy,
         }
@@ -184,12 +180,11 @@ def flattened_event_to_object(evt: dict) -> DERControl:
     )
 
 
-def get_event(mrid: str, output_dir: Path = DEFAULT_OUTPUT_DIR) -> DERControl | None:
-    output_path = output_dir / "events.db"
-    create_db()
+def get_event(mrid: str) -> DERControl | None:
+    db_path = create_db()
 
     sql = "SELECT * FROM events WHERE mRID = :mrid"
-    db = Database(output_path)
+    db = Database(db_path)
     with db.conn:
         res = db.query(sql, {"mrid": mrid})
         for x in res:
@@ -198,21 +193,19 @@ def get_event(mrid: str, output_dir: Path = DEFAULT_OUTPUT_DIR) -> DERControl | 
     return None
 
 
-def delete_event(mrid: str, output_dir: Path = DEFAULT_OUTPUT_DIR):
-    output_path = output_dir / "events.db"
+def delete_event(mrid: str):
+    db_path = EVENTS_DB
     sql = "DELETE FROM events WHERE mRID = :mrid"
-    db = Database(output_path)
+    db = Database(db_path)
     with db.conn:
         db.execute(sql, {"mrid": mrid})
     db.vacuum()
 
 
-def get_events(program: str, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[DERControl]:
-    output_path = output_dir / "events.db"
-    create_db()
-
+def get_events(program: str) -> list[DERControl]:
     sql = "SELECT * FROM events WHERE program = :prg ORDER BY start, creationTime"
-    db = Database(output_path)
+    db_path = create_db()
+    db = Database(db_path)
     events = []
     with db.conn:
         res = db.query(sql, {"prg": program})
@@ -222,21 +215,72 @@ def get_events(program: str, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[DERC
     return events
 
 
-def clear_mode_events(output_dir: Path = DEFAULT_OUTPUT_DIR):
-    output_path = output_dir / "events.db"
+def get_programs() -> list[str]:
+    sql = "SELECT DISTINCT program FROM events ORDER BY program"
+    db_path = create_db()
+    db = Database(db_path)
+    res = db.query(sql)
+    return [x["program"] for x in res]
+
+
+def get_modes(der: str) -> list[str]:
+    sql = "SELECT DISTINCT mode FROM mode_events WHERE der = :der ORDER BY 1"
+    db_path = create_db()
+    db = Database(db_path)
+    res = db.query(sql, {"der": der})
+    return [x["mode"] for x in res]
+
+
+def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
+    sql = "SELECT * FROM mode_events WHERE der = :der and mode = :mode ORDER BY start"
+    db_path = create_db()
+    db = Database(db_path)
+    events = []
+    with db.conn:
+        res = db.query(sql, {"der": der, "mode": mode})
+        for x in res:
+            item = ModeEvent(**x)
+            events.append(item)
+    return events
+
+
+def clear_mode_events():
     sql = "DELETE FROM mode_events"
-    db = Database(output_path)
+    db_path = EVENTS_DB
+    db = Database(db_path)
     with db.conn:
         db.execute(sql)
 
 
-def clear_old_events(output_dir: Path = DEFAULT_OUTPUT_DIR, days_to_keep: float = 3.0):
-    output_path = output_dir / "events.db"
-    create_db()
+def update_old_default_events():
+    """Default events can not be cancelled so modify duration"""
+    db_path = create_db()
+    sql = """SELECT * FROM events WHERE duration = 999999999 AND primacy > 255
+    AND program = :program ORDER BY start DESC"""
+    db = Database(db_path)
 
+    for program in get_programs():
+        with db.conn:
+            res = list(db.query(sql, {"program": program}))
+            for i, evt in enumerate(res):
+                if i == 0:
+                    continue  # Do nothing with most recent default event
+
+                mrid = evt["mRID"]
+                start = evt["start"]
+                prev_start = res[i - 1]["start"]
+                new_duration = prev_start - start
+                update_sql = "UPDATE events SET duration = :duration WHERE mRID = :mrid"
+                db.execute(update_sql, {"mrid": mrid, "duration": new_duration})
+
+
+def clear_old_events(days_to_keep: float = 3.0):
+    db_path = create_db()
     sql = "DELETE FROM events WHERE (start + duration) < :expire"
     now_utc = int(datetime.now(timezone.utc).timestamp())
-    db = Database(output_path)
+    seconds_to_keep = int(days_to_keep * 86400)
+    expire = now_utc - seconds_to_keep
+    db = Database(db_path)
     with db.conn:
-        db.execute(sql, {"expire": now_utc})
+        db.execute(sql, {"expire": expire})
     db.vacuum()
