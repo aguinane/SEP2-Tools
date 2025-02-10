@@ -1,12 +1,11 @@
 from datetime import date
-
-import pandas as pd
+from typing import Any
 
 from .eventsdb import get_day_mode_events, get_mode_events, get_modes
 from .times import timestamp_local_dt
 
 
-def get_modes_dataframe(der: str, day: date | None = None) -> pd.DataFrame:
+def get_modes_data(der: str, day: date | None = None) -> list[dict[str, Any]]:
     data = []
     for mode in get_modes(der):
         if day:
@@ -20,7 +19,7 @@ def get_modes_dataframe(der: str, day: date | None = None) -> pd.DataFrame:
             end = timestamp_local_dt(evt.end).replace(tzinfo=None)
             item = {"mode": mode, "time": end, "value": evt.value}
             data.append(item)
-    return pd.DataFrame(data)
+    return data
 
 
 DEFAULT_DIST_BREAKS = (1500, 5000, 10000)
@@ -38,7 +37,9 @@ def get_mode_day_distribution(
         duration = evt.end - evt.start
         num_seconds += duration
 
-    assert num_seconds == 86400
+    if num_seconds != 86400:
+        msg = f"Incomplete events for {der} {mode} {day}"
+        raise ValueError(msg)
 
     output = {
         "der": der,
