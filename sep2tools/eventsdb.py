@@ -13,7 +13,7 @@ from .models import (
     ModeEvent,
     ProgramInfo,
 )
-from .times import day_time_range
+from .times import day_time_range, event_days
 
 DEFAULT_EVENTS_DB_DIR = Path("")
 EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
@@ -256,6 +256,26 @@ def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
             item = ModeEvent(**x)
             events.append(item)
     return events
+
+
+def get_mode_event_range(der: str, mode: str) -> tuple[int, int]:
+    sql = """SELECT MIN(start) as start, MAX(end) as end 
+    FROM mode_events 
+    WHERE primacy < 255
+    AND der = :der and mode = :mode
+    """
+    db_path = create_db()
+    db = Database(db_path)
+    res = list(db.query(sql, {"der": der, "mode": mode}))
+    row = res[0]
+    start = row["start"]
+    end = row["end"]
+    return start, end
+
+
+def get_mode_event_days(der: str, mode: str) -> list[date]:
+    start, end = get_mode_event_range(der, mode)
+    return event_days(start, end)
 
 
 def get_day_mode_events(der: str, mode: str, day: date) -> list[ModeEvent]:

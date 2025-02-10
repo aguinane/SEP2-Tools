@@ -1,12 +1,15 @@
 from datetime import date
 
 import plotly.express as px
+import polars as pl
 
-from sep2tools.event_analysis import get_modes_dataframe
+from sep2tools.event_analysis import get_mode_day_distribution, get_modes_data
 from sep2tools.eventsdb import (
     add_enrolment,
     add_events,
     clear_old_events,
+    get_mode_event_days,
+    get_modes,
     update_mode_events,
 )
 from sep2tools.examples import example_controls, example_default_control
@@ -23,9 +26,19 @@ add_enrolment(der, program)
 update_mode_events()
 clear_old_events(days_to_keep=3.0)
 
+for mode in get_modes(der):
+    for day in get_mode_event_days(der, mode):
+        print(der, mode, day)
+        try:
+            res = get_mode_day_distribution(der, mode, day)
+        except ValueError:
+            continue
+        print(res)
+
 
 def chart_der_controls(der: str, day: date | None = None):
-    df = get_modes_dataframe(der, day)
+    data = get_modes_data(der, day)
+    df = pl.DataFrame(data)
     fig = px.line(df, x="time", y="value", color="mode", title=der)
     fig.update_layout(
         xaxis={"title": ""},
