@@ -1,6 +1,8 @@
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from sqlite_utils import Database
 
@@ -13,10 +15,18 @@ from .models import (
     ModeEvent,
     ProgramInfo,
 )
+from .times import current_date, day_time_range, event_days, timestamp_local_dt
+
+log = logging.getLogger(__name__)
+
 
 DEFAULT_EVENTS_DB_DIR = Path("")
 EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
 EVENTS_DB = EVENTS_DB_DIR / "events.db"
+
+DEFAULT_DIST_BREAKS = (1500, 5000, 10000)
+
+
 EVENT_COLS = {
     "mRID": str,
     "creationTime": int,
@@ -48,6 +58,19 @@ MODE_EVENT_COLS = {
     "primacy": int,
 }
 
+DAILY_SUMMARY_COLS = {
+    "der": str,
+    "day": str,
+    "mode": str,
+    "min_value": int,
+    "max_value": int,
+    "s_at_min": int,
+    "s_at_max": int,
+    "s_at_or_below_1500": int,
+    "s_at_or_below_5000": int,
+    "s_at_or_below_10000": int,
+}
+
 
 def create_db() -> Path:
     if EVENTS_DB.exists():
@@ -74,7 +97,13 @@ def create_db() -> Path:
         not_null=("der", "mode", "start", "end", "value"),
         if_not_exists=True,
     )
-
+    daily_summary = db["daily_summary"]
+    daily_summary.create(
+        DAILY_SUMMARY_COLS,
+        pk=("der", "day", "mode"),
+        not_null=("der", "day", "mode", "min_value", "max_value"),
+        if_not_exists=True,
+    )
     return EVENTS_DB
 
 
@@ -83,6 +112,19 @@ def add_enrolment(der: str, program: str):
     item = {"der": der, "program": program}
     db = Database(db_path)
     db["enrolments"].insert(item, replace=True)
+
+
+def get_ders() -> set[str]:
+    db_path = create_db()
+    db = Database(db_path)
+    sql = "SELECT DISTINCT der FROM enrolments ORDER BY der"
+    ders = set()
+    with db.conn:
+        res = db.query(sql)
+        for x in res:
+            der = x["der"]
+            ders.add(der)
+    return ders
 
 
 def get_enrolments() -> dict[str, list[str]]:
@@ -123,7 +165,7 @@ def add_events(events: list[DERControl]):
 
 
 def update_mode_events():
-    update_old_default_events()  # Should reduce conflicts
+    update_old_default_events()  # Should reduce conflicts to calculate
     clear_mode_events()
     enrolments = get_enrolments()
     for der, programs in enrolments.items():
@@ -135,6 +177,23 @@ def update_mode_events():
         clean_events = condense_events(raw_events)
         for mode, events in clean_events.items():
             add_mode_events(der, mode, events)
+
+
+def daily_summary_exists(der: str, mode: str, day: str) -> bool:
+    sql = "SELECT * FROM daily_summary WHERE der = :der AND mode = :mode AND day = :day"
+    db_path = create_db()
+    db = Database(db_path)
+    with db.conn:
+        res = db.query(sql, {"der": der, "mode": mode, "day": day})
+        for _ in res:
+            return True
+    return False
+
+
+def add_daily_summaries(records: list[dict]):
+    db_path = create_db()
+    db = Database(db_path)
+    db["daily_summary"].insert_all(records, replace=True)
 
 
 def add_mode_events(
@@ -244,6 +303,48 @@ def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
     return events
 
 
+def get_mode_event_range(der: str, mode: str) -> tuple[int, int]:
+    sql = """SELECT MIN(start) as start, MAX(end) as end 
+    FROM mode_events 
+    WHERE primacy < 255
+    AND der = :der and mode = :mode
+    """
+    db_path = create_db()
+    db = Database(db_path)
+    res = list(db.query(sql, {"der": der, "mode": mode}))
+    row = res[0]
+    start = row["start"]
+    end = row["end"]
+    return start, end
+
+
+def get_mode_event_days(der: str, mode: str) -> list[date]:
+    start, end = get_mode_event_range(der, mode)
+    return event_days(start, end)
+
+
+def get_day_mode_events(der: str, mode: str, day: date) -> list[ModeEvent]:
+    start, end = day_time_range(day)
+    sql = """SELECT * FROM mode_events 
+    WHERE der = :der and mode = :mode 
+    AND (start >= :start OR end >= :start)
+    AND (end <= :end OR start <= :end)
+    ORDER BY start"""
+    db_path = create_db()
+    db = Database(db_path)
+    events = []
+    with db.conn:
+        res = db.query(sql, {"der": der, "mode": mode, "start": start, "end": end})
+        for x in res:
+            item = ModeEvent(**x)
+            if item.start < start:
+                item.start = start
+            if item.end > end:
+                item.end = end
+            events.append(item)
+    return events
+
+
 def clear_mode_events():
     sql = "DELETE FROM mode_events"
     db_path = EVENTS_DB
@@ -274,7 +375,100 @@ def update_old_default_events():
                 db.execute(update_sql, {"mrid": mrid, "duration": new_duration})
 
 
+def get_modes_data(der: str, day: date | None = None) -> list[dict[str, Any]]:
+    data = []
+    for mode in get_modes(der):
+        if day:
+            mode_events = get_day_mode_events(der, mode, day)
+        else:
+            mode_events = get_mode_events(der, mode)
+        for evt in mode_events:
+            start = timestamp_local_dt(evt.start).replace(tzinfo=None)
+            item = {"mode": mode, "time": start, "value": evt.value}
+            data.append(item)
+            end = timestamp_local_dt(evt.end).replace(tzinfo=None)
+            item = {"mode": mode, "time": end, "value": evt.value}
+            data.append(item)
+    return data
+
+
+def get_mode_day_distribution(
+    der: str, mode: str, day: date, breaks: tuple[int] = DEFAULT_DIST_BREAKS
+):
+    mode_events = get_day_mode_events(der, mode, day)
+    max_value = max([x.value for x in mode_events])
+    min_value = min([x.value for x in mode_events])
+    num_seconds = 0
+
+    for evt in mode_events:
+        duration = evt.end - evt.start
+        num_seconds += duration
+
+    if num_seconds != 86400:
+        msg = f"Incomplete events for {der} {mode} {day}"
+        raise ValueError(msg)
+
+    output = {
+        "der": der,
+        "mode": mode,
+        "day": str(day),
+        "min_value": min_value,
+        "max_value": max_value,
+    }
+
+    # Determine time at minimum
+    output["s_at_min"] = sum(
+        [evt.end - evt.start for evt in mode_events if evt.value == min_value]
+    )
+
+    # Determine time at maximum
+    output["s_at_max"] = sum(
+        [evt.end - evt.start for evt in mode_events if evt.value == max_value]
+    )
+
+    # Determine time at break points
+    breaks = sorted(tuple(breaks), reverse=True)
+    for break_val in breaks:
+        output[f"s_at_or_below_{break_val}"] = sum(
+            [evt.end - evt.start for evt in mode_events if evt.value <= break_val]
+        )
+    return output
+
+
+def update_daily_summaries(previous_days: int = 3):
+    update_mode_events()
+    today = current_date()
+    start_date = today - timedelta(days=previous_days)
+    records = []
+    for der in get_ders():
+        for mode in get_modes(der):
+            for day in get_mode_event_days(der, mode):
+                if day >= today:
+                    continue  # Do not calculate until day is over
+                if day < start_date:
+                    continue  # Do not calculate historical days
+                if daily_summary_exists(der, mode, day):
+                    log.debug(
+                        "Skip summary calculation for existing record %s %s %s",
+                        der,
+                        mode,
+                        day,
+                    )
+                    continue  # Skip already calculated
+                try:
+                    res = get_mode_day_distribution(der, mode, day)
+                except ValueError:
+                    log.info("Incomplete day for %s %s %s", der, mode, day)
+                    continue
+                records.append(res)
+    add_daily_summaries(records)
+
+
 def clear_old_events(days_to_keep: float = 3.0):
+    # Perform some analysis before clearing
+    update_daily_summaries(int(days_to_keep))
+
+    # Clear old events
     db_path = create_db()
     sql = "DELETE FROM events WHERE (start + duration) < :expire"
     now_utc = int(datetime.now(timezone.utc).timestamp())

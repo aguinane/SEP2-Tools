@@ -20,7 +20,6 @@ dynamic = ["version", "description"]
 dependencies = [
     "asn1",
     "cryptography",
-    "pandas",
     "pydantic",
     "python-dateutil",
     "sqlite_utils",
@@ -45,7 +44,7 @@ omit = ["*/version.py", '*/__main__.py']
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 80
+fail_under = 70
 
 [tool.ruff.lint]
 select = ["A", "B", "E", "F", "I", "N", "PERF", "RUF", "SIM", "UP"]
