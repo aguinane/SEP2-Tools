@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from sqlite_utils import Database
 
 from .events import condense_events
@@ -17,11 +19,10 @@ from .models import (
 )
 from .times import current_date, day_time_range, event_days, timestamp_local_dt
 
+load_dotenv()
 log = logging.getLogger(__name__)
-
-
-DEFAULT_EVENTS_DB_DIR = Path("")
-EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
+events_dir = os.getenv("EVENTS_DB_DIR", "")
+EVENTS_DB_DIR = Path(events_dir)
 EVENTS_DB = EVENTS_DB_DIR / "events.db"
 
 DEFAULT_DIST_BREAKS = (1500, 5000, 10000)
@@ -258,7 +259,22 @@ def delete_event(mrid: str):
     db = Database(db_path)
     with db.conn:
         db.execute(sql, {"mrid": mrid})
-    db.vacuum()
+
+
+def update_event_status(mrid: str, new_status: int):
+    db_path = EVENTS_DB
+    sql = "UPDATE events SET currentStatus = :status WHERE mRID = :mrid"
+    db = Database(db_path)
+    with db.conn:
+        db.execute(sql, {"mrid": mrid, "status": new_status})
+
+
+def update_event_controls(mrid: str, control_json: str):
+    db_path = EVENTS_DB
+    sql = "UPDATE events SET controls = :ctrl WHERE mRID = :mrid"
+    db = Database(db_path)
+    with db.conn:
+        db.execute(sql, {"mrid": mrid, "ctrl": control_json})
 
 
 def get_events(program: str) -> list[DERControl]:
