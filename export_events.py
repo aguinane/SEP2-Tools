@@ -14,17 +14,17 @@ from sep2tools.eventsdb import (
 from sep2tools.examples import example_controls, example_default_control
 from sep2tools.times import current_date
 
-der = "EXAMPLEDER"
-program = "EXAMPLEPRG"
-example_events = [
-    *example_controls(program=program, num=24),
-    example_default_control(program=program),
-]
-add_events(example_events)
-add_enrolment(der, program)
-update_mode_events()
-update_daily_summaries()
-clear_old_events(days_to_keep=3.0)
+
+def write_example_events(der: str, program: str):
+    example_events = [
+        *example_controls(program=program),
+        example_default_control(program=program),
+    ]
+    add_events(example_events)
+    add_enrolment(der, program)
+    update_mode_events()
+    update_daily_summaries()
+    clear_old_events(days_to_keep=3.0)
 
 
 def chart_der_controls(der: str, day: date | None = None):
@@ -38,6 +38,10 @@ def chart_der_controls(der: str, day: date | None = None):
     return fig
 
 
-today = current_date()
-fig = chart_der_controls(der, today)
-fig.show()
+if __name__ == "__main__":
+    der = "EXAMPLEDER"
+    program = "EXAMPLEPRG"
+    write_example_events(der, program)
+    today = current_date()
+    fig = chart_der_controls(der)
+    fig.show()

@@ -17,7 +17,13 @@ from .models import (
     ModeEvent,
     ProgramInfo,
 )
-from .times import current_date, day_time_range, event_days, timestamp_local_dt
+from .times import (
+    current_date,
+    day_time_range,
+    event_days,
+    next_interval,
+    timestamp_local_dt,
+)
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -393,16 +399,23 @@ def update_old_default_events():
 
 def get_modes_data(der: str, day: date | None = None) -> list[dict[str, Any]]:
     data = []
+    # Ignore events that are 25+ hours in future
+    # If you do not - the default control runs for years
+    event_cutoff = next_interval() + 90000
     for mode in get_modes(der):
         if day:
             mode_events = get_day_mode_events(der, mode, day)
         else:
             mode_events = get_mode_events(der, mode)
         for evt in mode_events:
-            start = timestamp_local_dt(evt.start).replace(tzinfo=None)
+            evt_start = evt.start
+            start = timestamp_local_dt(evt_start).replace(tzinfo=None)
             item = {"mode": mode, "time": start, "value": evt.value}
             data.append(item)
-            end = timestamp_local_dt(evt.end).replace(tzinfo=None)
+            evt_end = evt.end
+            if evt_end > event_cutoff:
+                evt_end = max(event_cutoff, evt_start)
+            end = timestamp_local_dt(evt_end).replace(tzinfo=None)
             item = {"mode": mode, "time": end, "value": evt.value}
             data.append(item)
     return data

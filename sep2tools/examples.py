@@ -9,7 +9,7 @@ from sep2tools.models import (
     EventStatus,
     ProgramInfo,
 )
-from sep2tools.times import next_interval
+from sep2tools.times import next_interval, timestamp_local_dt
 
 
 def example_control(
@@ -18,8 +18,11 @@ def example_control(
     mrid = generate_mrid(0, group=False)
     now_utc = datetime.now(timezone.utc).replace(microsecond=0)
     creation_time = int(now_utc.timestamp())
-    exp_limit = randint(15, 100) * 100
-    imp_limit = randint(15, 100) * 100
+    hour = timestamp_local_dt(start).hour
+    exp_min = 15 if 9 <= hour < 16 else 100
+    imp_min = 15 if 16 <= hour < 21 else 100
+    exp_limit = randint(exp_min, 100) * 100
+    imp_limit = randint(imp_min, 100) * 100
     evt = DERControl(
         mRID=mrid,
         creationTime=creation_time,
@@ -67,7 +70,7 @@ def example_default_control(
     return evt
 
 
-def example_controls(program: str = "EXAMPLEPRG", num: int = 6) -> list[DERControl]:
+def example_controls(program: str = "EXAMPLEPRG", num: int = 288) -> list[DERControl]:
     events = []
     start = next_interval(5)
     duration = 300
