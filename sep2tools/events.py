@@ -38,7 +38,7 @@ def split_overlapping_events(events: list[ModeEvent]) -> list[ModeEvent]:
                 continue
             if evt.end <= xstart:
                 continue
-            nevt = evt.copy()
+            nevt = evt.model_copy()
             nevt.start = xstart
             nevt.end = xend
             new_events.append(nevt)

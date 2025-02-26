@@ -172,3 +172,4 @@ certs/
 uv.lock
 !example-certs/*
 *.db
+requirements.txt

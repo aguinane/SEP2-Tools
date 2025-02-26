@@ -1,4 +1,5 @@
 from sep2tools.eventsdb import (
+    add_enrolment,
     add_events,
     clear_old_events,
     delete_event,
@@ -26,14 +27,31 @@ def test_todays_events():
 
 def test_event_creation():
     """Test events are created and deleted from DB"""
-    exp1 = example_default_control()
-    exp2 = example_controls(num=1)[0]
+    program = "TESTDERPROGRAM"
+    exp1 = example_default_control(program=program)
+    exp2 = example_controls(program=program, num=1)[0]
     examples = [exp1, exp2]
     for exp in examples:
         mrid = exp.mRID
         add_events([exp])
         evt = get_event(mrid=mrid)
         assert exp == evt
+        delete_event(mrid)
+
+
+def test_mass_event_creation():
+    """Test events are created and deleted from DB"""
+    der = "TESTDEREXAMPLE"
+    program = "TESTDERPROGRAM"
+    add_enrolment(der, program)
+    default_evt = example_default_control(program=program)
+    examples = [default_evt, *example_controls(program=program, num=500)]
+    mrids = [exp.mRID for exp in examples]
+    add_events(examples)
+    clear_old_events()
+
+    # Cleanup events
+    for mrid in mrids:
         delete_event(mrid)
 
 

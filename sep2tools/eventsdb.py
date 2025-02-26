@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from sqlite_utils import Database
 
 from .events import condense_events
@@ -15,13 +17,18 @@ from .models import (
     ModeEvent,
     ProgramInfo,
 )
-from .times import current_date, day_time_range, event_days, timestamp_local_dt
+from .times import (
+    current_date,
+    day_time_range,
+    event_days,
+    next_interval,
+    timestamp_local_dt,
+)
 
+load_dotenv()
 log = logging.getLogger(__name__)
-
-
-DEFAULT_EVENTS_DB_DIR = Path("")
-EVENTS_DB_DIR = DEFAULT_EVENTS_DB_DIR
+events_dir = os.getenv("EVENTS_DB_DIR", "")
+EVENTS_DB_DIR = Path(events_dir)
 EVENTS_DB = EVENTS_DB_DIR / "events.db"
 
 DEFAULT_DIST_BREAKS = (1500, 5000, 10000)
@@ -252,13 +259,43 @@ def get_event(mrid: str) -> DERControl | None:
     return None
 
 
+def get_default_event(program: str) -> DERControl | None:
+    db_path = create_db()
+    sql = """SELECT * FROM events
+    WHERE duration = 999999999 AND primacy > 255 AND program = :prog
+    ORDER BY creationTime DESC
+    """
+    db = Database(db_path)
+    with db.conn:
+        res = db.query(sql, {"prog": program})
+        for x in res:
+            item = flattened_event_to_object(x)
+            return item
+    return None
+
+
 def delete_event(mrid: str):
     db_path = EVENTS_DB
     sql = "DELETE FROM events WHERE mRID = :mrid"
     db = Database(db_path)
     with db.conn:
         db.execute(sql, {"mrid": mrid})
-    db.vacuum()
+
+
+def update_event_status(mrid: str, new_status: int):
+    db_path = EVENTS_DB
+    sql = "UPDATE events SET currentStatus = :status WHERE mRID = :mrid"
+    db = Database(db_path)
+    with db.conn:
+        db.execute(sql, {"mrid": mrid, "status": new_status})
+
+
+def update_event_controls(mrid: str, control_json: str):
+    db_path = EVENTS_DB
+    sql = "UPDATE events SET controls = :ctrl WHERE mRID = :mrid"
+    db = Database(db_path)
+    with db.conn:
+        db.execute(sql, {"mrid": mrid, "ctrl": control_json})
 
 
 def get_events(program: str) -> list[DERControl]:
@@ -377,16 +414,23 @@ def update_old_default_events():
 
 def get_modes_data(der: str, day: date | None = None) -> list[dict[str, Any]]:
     data = []
+    # Ignore events that are 25+ hours in future
+    # If you do not - the default control runs for years
+    event_cutoff = next_interval() + 90000
     for mode in get_modes(der):
         if day:
             mode_events = get_day_mode_events(der, mode, day)
         else:
             mode_events = get_mode_events(der, mode)
         for evt in mode_events:
-            start = timestamp_local_dt(evt.start).replace(tzinfo=None)
+            evt_start = evt.start
+            start = timestamp_local_dt(evt_start).replace(tzinfo=None)
             item = {"mode": mode, "time": start, "value": evt.value}
             data.append(item)
-            end = timestamp_local_dt(evt.end).replace(tzinfo=None)
+            evt_end = evt.end
+            if evt_end > event_cutoff:
+                evt_end = max(event_cutoff, evt_start)
+            end = timestamp_local_dt(evt_end).replace(tzinfo=None)
             item = {"mode": mode, "time": end, "value": evt.value}
             data.append(item)
     return data
