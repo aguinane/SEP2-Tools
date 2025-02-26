@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from random import randint
 
 from sep2tools import generate_mrid
+from sep2tools.eventsdb import get_default_event
 from sep2tools.models import (
     DateTimeInterval,
     DERControl,
@@ -48,6 +49,10 @@ def example_default_control(
     mrid = generate_mrid(0, group=False)
     now_utc = datetime.now(timezone.utc).replace(microsecond=0)
     creation_time = int(now_utc.timestamp())
+
+    # In order to not break tests - set first default control at least one day ago
+    if get_default_event(program) is None:
+        creation_time = creation_time - 86400
     # A default starts when it is created
     start = creation_time
     # If replaced the new one will have a newer creation time and supersede

@@ -259,6 +259,21 @@ def get_event(mrid: str) -> DERControl | None:
     return None
 
 
+def get_default_event(program: str) -> DERControl | None:
+    db_path = create_db()
+    sql = """SELECT * FROM events
+    WHERE duration = 999999999 AND primacy > 255 AND program = :prog
+    ORDER BY creationTime DESC
+    """
+    db = Database(db_path)
+    with db.conn:
+        res = db.query(sql, {"prog": program})
+        for x in res:
+            item = flattened_event_to_object(x)
+            return item
+    return None
+
+
 def delete_event(mrid: str):
     db_path = EVENTS_DB
     sql = "DELETE FROM events WHERE mRID = :mrid"
