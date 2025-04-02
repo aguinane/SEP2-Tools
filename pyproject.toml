@@ -18,7 +18,7 @@ classifiers = [
 requires-python = ">=3.10"
 dynamic = ["version", "description"]
 dependencies = [
-    "asn1>=2.8.0 ",
+    "asn1==2.8.0",
     "cryptography>=44.0.1",
     "pydantic>=2.10.6 ",
     "python-dateutil>=2.8.2",
