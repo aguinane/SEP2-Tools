@@ -53,6 +53,45 @@ def random_id() -> str:
     return str(uuid.uuid4()).replace("-", "")[:10].upper()
 
 
+def generate_csr_file(key_file: Path, hostnames: list[str] | None = None) -> Path:
+    # Load the private key
+    with open(key_file, "rb") as fh:
+        pem_data = fh.read()
+        key = serialization.load_pem_private_key(
+            pem_data, password=None, backend=default_backend()
+        )
+
+    # CSR output file path
+    csr_file = key_file.with_suffix(".csr")
+
+    # Subject Alternative Names (SANs)
+    san_list = []
+    if hostnames:
+        msg = "Note that SEP2 Certificates do not require a hostname"
+        log.warning(msg)
+        for name in hostnames:
+            san = x509.DNSName(name)
+            san_list.append(san)
+
+    cb = x509.CertificateSigningRequestBuilder()
+    subject_name = ""
+    cb = cb.subject_name(x509.Name(subject_name))
+    if hostnames:
+        cb = cb.add_extension(
+            x509.SubjectAlternativeName(san_list),
+            critical=False,
+        )
+
+    csr = cb.sign(key, SHA256())
+
+    csr_pem = csr.public_bytes(serialization.Encoding.PEM)
+    with open(csr_file, "wb") as fh:
+        fh.write(csr_pem)
+        log.info("Created CSR at %s", csr_file)
+
+    return csr_file
+
+
 def generate_key(
     key_file: Path | None = None,
     generate_csr: bool = True,
@@ -78,32 +117,7 @@ def generate_key(
 
     csr_file = None
     if generate_csr:
-        csr_file = key_file.with_suffix(".csr")
-        subject_name = ""
-
-        # Subject Alternative Names (SANs)
-        san_list = []
-        if hostnames:
-            msg = "Note that SEP2 Certificates do not require a hostname"
-            log.warning(msg)
-            for name in hostnames:
-                san = x509.DNSName(name)
-                san_list.append(san)
-
-        cb = x509.CertificateSigningRequestBuilder()
-        cb = cb.subject_name(x509.Name(subject_name))
-        if hostnames:
-            cb = cb.add_extension(
-                x509.SubjectAlternativeName(san_list),
-                critical=False,
-            )
-
-        csr = cb.sign(key, SHA256())
-
-        csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-        with open(csr_file, "wb") as fh:
-            fh.write(csr_pem)
-            log.info("Created CSR at %s", csr_file)
+        csr_file = generate_csr_file(key_file, hostnames=hostnames)
 
     return key_file, csr_file
 

@@ -10,15 +10,15 @@ license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.10",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version", "description"]
 dependencies = [
-    "asn1>=2.8.0 ",
+    "asn1==2.8.0",
     "cryptography>=44.0.1",
     "pydantic>=2.10.6 ",
     "python-dateutil>=2.8.2",

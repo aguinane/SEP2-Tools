@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from cryptography import x509
@@ -8,7 +8,7 @@ from cryptography.x509 import Certificate
 from .cert_id import is_pem_certificate
 
 log = logging.getLogger(__name__)
-INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0, timezone.utc)  # As per standard
+INDEF_EXPIRY = datetime(9999, 12, 31, 23, 59, 59, 0, UTC)  # As per standard
 
 
 def load_certificate(cert_path: Path) -> Certificate:
@@ -61,7 +61,7 @@ def validate_certificate(cert_path: Path) -> bool:
     valid = True
 
     # Check the validity period
-    current_time_utc = datetime.now(timezone.utc)
+    current_time_utc = datetime.now(UTC)
     if not cert.not_valid_before_utc <= current_time_utc:
         msg = "Certificate is not valid yet. "
         msg += "Not valid before {cert.not_valid_before_utc}"

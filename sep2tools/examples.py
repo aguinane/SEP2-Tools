@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from random import randint
 
 from sep2tools import generate_mrid
@@ -17,7 +17,7 @@ def example_control(
     start: int, duration: int = 300, program: str = "EXAMPLEPRG", primacy: int = 1
 ) -> DERControl:
     mrid = generate_mrid(0, group=False)
-    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
+    now_utc = datetime.now(UTC).replace(microsecond=0)
     creation_time = int(now_utc.timestamp())
     hour = timestamp_local_dt(start).hour
     exp_min = 15 if 9 <= hour < 16 else 100
@@ -47,7 +47,7 @@ def example_default_control(
     # but still have correct order if multiple defaults
     default_primacy = 256 + primacy
     mrid = generate_mrid(0, group=False)
-    now_utc = datetime.now(timezone.utc).replace(microsecond=0)
+    now_utc = datetime.now(UTC).replace(microsecond=0)
     creation_time = int(now_utc.timestamp())
 
     # In order to not break tests - set first default control at least one day ago
