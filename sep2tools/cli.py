@@ -61,7 +61,7 @@ def create_key(
     logging.basicConfig(level=log_level, format=LOG_FORMAT)
 
     hostnames = None if not hostname else [hostname]
-    key, csr = generate_key(key_file, generate_csr=True, hostnames=hostnames)
+    _key, _csr = generate_key(key_file, generate_csr=True, hostnames=hostnames)
 
 
 @app.command()
@@ -75,7 +75,7 @@ def create_serca(
 
     output_dir.mkdir(exist_ok=True)
     key_file = output_dir / "serca.key"
-    key, csr = generate_key(key_file, generate_csr=False)
+    key, _csr = generate_key(key_file, generate_csr=False)
     generate_serca(key, org_name=org_name)
 
 
@@ -92,7 +92,7 @@ def create_mica(
 
     output_dir.mkdir(exist_ok=True)
     key_file = output_dir / "mica.key"
-    key, csr = generate_key(key_file, generate_csr=True)
+    _key, csr = generate_key(key_file, generate_csr=True)
     generate_mica(csr, ca_cert, ca_key, org_name=org_name)
 
 
