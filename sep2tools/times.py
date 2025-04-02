@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from dateutil import tz
 
@@ -6,7 +6,7 @@ DEFAULT_TZ = tz.gettz("Australia/Brisbane")
 
 
 def current_timestamp() -> int:
-    now_utc = datetime.now(timezone.utc).timestamp()
+    now_utc = datetime.now(UTC).timestamp()
     return int(now_utc)
 
 
@@ -16,7 +16,7 @@ def current_date(tzinfo=DEFAULT_TZ) -> date:
 
 
 def next_interval(interval_min: int = 5) -> int:
-    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
     now = now + timedelta(minutes=1)  # Add a buffer
     delta = timedelta(minutes=(interval_min - now.minute % interval_min))
     next_dt = now + delta
@@ -24,15 +24,15 @@ def next_interval(interval_min: int = 5) -> int:
 
 
 def timestamp_local_dt(start: int, tzinfo=DEFAULT_TZ) -> datetime:
-    utc_dt = datetime.fromtimestamp(start, tz=timezone.utc)
+    utc_dt = datetime.fromtimestamp(start, tz=UTC)
     return utc_dt.astimezone(tzinfo)
 
 
 def day_time_range(day: date, tzinfo=DEFAULT_TZ) -> tuple[int, int]:
     day_start = datetime(day.year, day.month, day.day, tzinfo=tzinfo)
     day_end = day_start + timedelta(days=1)
-    utc_start = int(day_start.astimezone(timezone.utc).timestamp())
-    utc_end = int(day_end.astimezone(timezone.utc).timestamp())
+    utc_start = int(day_start.astimezone(UTC).timestamp())
+    utc_end = int(day_end.astimezone(UTC).timestamp())
     return utc_start, utc_end
 
 

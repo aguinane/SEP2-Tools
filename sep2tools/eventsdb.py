@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -542,7 +542,7 @@ def clear_old_events(days_to_keep: float = 3.0):
     # Clear old events
     db_path = create_events_db()
     sql = "DELETE FROM events WHERE (start + duration) < :expire"
-    now_utc = int(datetime.now(timezone.utc).timestamp())
+    now_utc = int(datetime.now(UTC).timestamp())
     seconds_to_keep = int(days_to_keep * 86400)
     expire = now_utc - seconds_to_keep
     db = Database(db_path)
