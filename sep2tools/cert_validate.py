@@ -54,6 +54,22 @@ def get_certificate_policy_oids(cert_path: Path) -> list[str]:
     return oids
 
 
+def get_cert_san_other_names_policy_oids(cert_path: Path) -> list[str]:
+    """Load X.509 DER Certificate in PEM format and
+    return Subject Alternative Name Other Names Policy OIDs"""
+
+    cert = load_certificate(cert_path)
+    sans = cert.extensions.get_extension_for_oid(
+        x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+    ).value
+    other_names = []
+    for entry in sans:
+        if isinstance(entry, x509.OtherName):
+            oid = entry.type_id.dotted_string
+            other_names.append(oid)
+    return other_names
+
+
 def validate_certificate(cert_path: Path) -> bool:
     """Load X.509 DER Certificate in PEM format and validate"""
 
@@ -79,16 +95,48 @@ def validate_certificate(cert_path: Path) -> bool:
         valid = False
 
     # Verify the OIDs
+    oid_intro = "1.3.6.1.4.1"
+    oid_pen = "40732"
+
+    oid_into = f"{oid_intro}.{oid_pen}"
+    oid_device_start = f"{oid_intro}.{oid_pen}.1."
     sep2_dev_type = False
-    dev_oid_start = "1.3.6.1.4.1.40732.1."
+
+    oid_test_end = f".{oid_pen}.2.1"
+    test_oid = False
+
     oids = get_certificate_policy_oids(cert_path)
     for oid in oids:
-        if dev_oid_start in oid:
+        if oid_test_end in oid:
+            test_oid = oid
+        elif oid_device_start in oid:
             sep2_dev_type = True
+        elif oid_into in oid:
+            pass
+        else:
+            log.warning("Certificate has a non SEP2 policy specified: %s", oid)
+
+    if test_oid:
+        msg = f"Certificate is a test certificate as {test_oid} set."
+        log.warning(msg)
+
     if not sep2_dev_type:
         msg = "At least one SEP2 device type assignment policy must be specified. "
-        msg += f"That is an OID like {dev_oid_start}.X"
+        msg += f"That is an OID like {oid_device_start}X"
         log.error(msg)
         valid = False
+
+    # Verify the Other Name OID in the SAN
+    sep2_hw_mod_name = False
+    oid_hw_mod_name = "1.3.6.1.5.5.7.8.4"
+    san_oids = get_cert_san_other_names_policy_oids(cert_path)
+    for oid in san_oids:
+        if oid == oid_hw_mod_name:
+            sep2_hw_mod_name = True
+
+    if not sep2_hw_mod_name:
+        msg = f"SEP2 Hardware Module Name OID {oid_hw_mod_name} "
+        msg += "not found in SAN OtherName."
+        log.error(msg)
 
     return valid

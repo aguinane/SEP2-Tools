@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -53,7 +52,7 @@ def cert_lfdi(filepath: Path, verbose: bool = False) -> None:
 
 @app.command()
 def create_key(
-    key_file: Optional[Path] = None,  # noqa: UP007
+    key_file: Path | None = None,
     hostname: str = "",
     verbose: bool = False,
 ) -> None:
