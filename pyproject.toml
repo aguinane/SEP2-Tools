@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=2.7.3", "pytest-cov>=6.0.0", "ruff>=0.9.7"]
+test = ["pytest>=2.7.3", "pytest-cov>=6.0.0"]
 
 [project.scripts]
 sep2tools = "sep2tools.cli:app"
