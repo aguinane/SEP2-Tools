@@ -116,7 +116,8 @@ def validate_certificate(cert_path: Path) -> bool:
             sep2_hw_mod_name = True
 
     if not sep2_hw_mod_name:
-        msg = f"SEP2 Hardware Module Name OID {oid_hw_mod_name} not found in SAN OtherName."
+        msg = f"SEP2 Hardware Module Name OID {oid_hw_mod_name} "
+        msg += "not found in SAN OtherName."
         log.error(msg)
 
     return valid
