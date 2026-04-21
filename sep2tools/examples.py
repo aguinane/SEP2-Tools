@@ -4,6 +4,7 @@ from random import randint
 from sep2tools import generate_mrid
 from sep2tools.eventsdb import get_default_event
 from sep2tools.models import (
+    CurrentStatus,
     DateTimeInterval,
     DERControl,
     DERControlBase,
@@ -27,7 +28,7 @@ def example_control(
     evt = DERControl(
         mRID=mrid,
         creationTime=creation_time,
-        EventStatus=EventStatus(currentStatus=0),  # Scheduled
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),  # Scheduled
         interval=DateTimeInterval(start=start, duration=duration),
         randomizeStart=10,
         controls=[
@@ -63,7 +64,7 @@ def example_default_control(
     evt = DERControl(
         mRID=mrid,
         creationTime=creation_time,
-        EventStatus=EventStatus(currentStatus=1),  # Active
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=1)),  # Active
         interval=DateTimeInterval(start=start, duration=duration),
         randomizeStart=10,
         controls=[

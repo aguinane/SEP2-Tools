@@ -1,5 +1,6 @@
 from sep2tools.events import condense_events
 from sep2tools.models import (
+    CurrentStatus,
     DateTimeInterval,
     DERControl,
     DERControlBase,
@@ -11,7 +12,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="1A",
         creationTime=0,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=50, duration=50),
         controls=[
             DERControlBase(mode="opModExpLimW", value=1500),
@@ -22,7 +23,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="1B",
         creationTime=3,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=50, duration=50),
         controls=[
             DERControlBase(mode="opModExpLimW", value=1500),
@@ -33,7 +34,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="2",
         creationTime=0,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=100, duration=50),
         controls=[DERControlBase(mode="opModExpLimW", value=15, multiplier=3)],
         ProgramInfo=ProgramInfo(primacy=1),
@@ -41,7 +42,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="3",
         creationTime=0,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=120, duration=50),
         controls=[DERControlBase(mode="opModExpLimW", value=20, multiplier=3)],
         ProgramInfo=ProgramInfo(primacy=0),
@@ -49,7 +50,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="4",
         creationTime=0,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=150, duration=50),
         controls=[DERControlBase(mode="opModExpLimW", value=15, multiplier=3)],
         ProgramInfo=ProgramInfo(primacy=1),
@@ -57,7 +58,7 @@ EXAMPLE_EVENTS = [
     DERControl(
         mRID="5",
         creationTime=0,
-        EventStatus=EventStatus(currentStatus=0),
+        EventStatus=EventStatus(currentStatus=CurrentStatus(value=0)),
         interval=DateTimeInterval(start=250, duration=50),
         controls=[
             DERControlBase(mode="opModExpLimW", value=1500),

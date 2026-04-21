@@ -10,6 +10,7 @@ from sqlite_utils import Database
 
 from .events import condense_events
 from .models import (
+    CurrentStatus,
     DateTimeInterval,
     DERControl,
     DERControlBase,
@@ -204,7 +205,7 @@ def update_mode_events():
             add_mode_events(der, mode, events)
 
 
-def daily_summary_exists(der: str, mode: str, day: str) -> bool:
+def daily_summary_exists(der: str, mode: str, day: date | str) -> bool:
     sql = """SELECT * FROM daily_summary 
     WHERE der = :der AND mode = :mode AND day = :day
     AND incomplete = 0
@@ -250,7 +251,7 @@ def add_mode_events(
 
 
 def flattened_event_to_object(evt: dict) -> DERControl:
-    status = EventStatus(currentStatus=evt["currentStatus"])
+    status = EventStatus(currentStatus=CurrentStatus(evt["currentStatus"]))
     interval = DateTimeInterval(start=evt["start"], duration=evt["duration"])
     program = ProgramInfo(program=evt["program"], primacy=evt["primacy"])
     controls_list = json.loads(evt["controls"])
@@ -461,8 +462,9 @@ def get_mode_day_distribution(
     der: str, mode: str, day: date, breaks: tuple[int] = DEFAULT_DIST_BREAKS
 ):
     mode_events = get_day_mode_events(der, mode, day)
-    max_value = max([x.value for x in mode_events])
-    min_value = min([x.value for x in mode_events])
+    values = [x.value for x in mode_events]
+    max_value = max(values) if values else 0
+    min_value = min(values) if values else 0
 
     num_seconds = 0
     daily_wh = 0
