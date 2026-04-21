@@ -54,6 +54,22 @@ def get_certificate_policy_oids(cert_path: Path) -> list[str]:
     return oids
 
 
+def get_cert_san_other_names_policy_oids(cert_path: Path) -> list[str]:
+    """Load X.509 DER Certificate in PEM format and
+    return Subject Alternative Name Other Names Policy OIDs"""
+
+    cert = load_certificate(cert_path)
+    sans = cert.extensions.get_extension_for_oid(
+        x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+    ).value
+    other_names = []
+    for entry in sans:
+        if isinstance(entry, x509.OtherName):
+            oid = entry.type_id.dotted_string
+            other_names.append(oid)
+    return other_names
+
+
 def validate_certificate(cert_path: Path) -> bool:
     """Load X.509 DER Certificate in PEM format and validate"""
 
@@ -90,5 +106,17 @@ def validate_certificate(cert_path: Path) -> bool:
         msg += f"That is an OID like {dev_oid_start}.X"
         log.error(msg)
         valid = False
+
+    # Verify the Other Name OID in the SAN
+    sep2_hw_mod_name = False
+    oid_hw_mod_name = "1.3.6.1.5.5.7.8.4"
+    san_oids = get_cert_san_other_names_policy_oids(cert_path)
+    for oid in san_oids:
+        if oid == oid_hw_mod_name:
+            sep2_hw_mod_name = True
+
+    if not sep2_hw_mod_name:
+        msg = f"SEP2 Hardware Module Name OID {oid_hw_mod_name} not found in SAN OtherName."
+        log.error(msg)
 
     return valid
