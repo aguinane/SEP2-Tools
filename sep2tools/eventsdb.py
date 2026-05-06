@@ -87,27 +87,28 @@ def create_events_db() -> Path:
     if EVENTS_DB.exists():
         return EVENTS_DB
     db = Database(EVENTS_DB, strict=True)
-    events = db["events"]
-    events.create(
-        EVENT_COLS,
-        pk="mRID",
-        not_null=["creationTime", "start", "duration", "controls"],
-        if_not_exists=True,
-    )
-    enrolments = db["enrolments"]
-    enrolments.create(
-        ENROLMENT_COLS,
-        pk=("der", "program"),
-        not_null=("der", "program"),
-        if_not_exists=True,
-    )
-    mode_events = db["mode_events"]
-    mode_events.create(
-        MODE_EVENT_COLS,
-        pk=("der", "mode", "start", "end"),
-        not_null=("der", "mode", "start", "end", "value"),
-        if_not_exists=True,
-    )
+    with db.conn:
+        events = db["events"]
+        events.create(
+            EVENT_COLS,
+            pk="mRID",
+            not_null=["creationTime", "start", "duration", "controls"],
+            if_not_exists=True,
+        )
+        enrolments = db["enrolments"]
+        enrolments.create(
+            ENROLMENT_COLS,
+            pk=("der", "program"),
+            not_null=("der", "program"),
+            if_not_exists=True,
+        )
+        mode_events = db["mode_events"]
+        mode_events.create(
+            MODE_EVENT_COLS,
+            pk=("der", "mode", "start", "end"),
+            not_null=("der", "mode", "start", "end", "value"),
+            if_not_exists=True,
+        )
     return EVENTS_DB
 
 
@@ -115,21 +116,22 @@ def create_summary_db() -> Path:
     if SUMMARY_DB.exists():
         return SUMMARY_DB
     db = Database(SUMMARY_DB, strict=True)
-    daily_summary = db["daily_summary"]
-    daily_summary.create(
-        DAILY_SUMMARY_COLS,
-        pk=("der", "day", "mode"),
-        not_null=(
-            "der",
-            "day",
-            "mode",
-            "incomplete",
-            "min_value",
-            "max_value",
-            "daily_wh",
-        ),
-        if_not_exists=True,
-    )
+    with db.conn:
+        daily_summary = db["daily_summary"]
+        daily_summary.create(
+            DAILY_SUMMARY_COLS,
+            pk=("der", "day", "mode"),
+            not_null=(
+                "der",
+                "day",
+                "mode",
+                "incomplete",
+                "min_value",
+                "max_value",
+                "daily_wh",
+            ),
+            if_not_exists=True,
+        )
     return SUMMARY_DB
 
 
@@ -137,7 +139,8 @@ def add_enrolment(der: str, program: str):
     db_path = create_events_db()
     item = {"der": der, "program": program}
     db = Database(db_path)
-    db["enrolments"].insert(item, replace=True)
+    with db.conn:
+        db["enrolments"].insert(item, replace=True)
 
 
 def get_ders() -> set[str]:
@@ -170,24 +173,26 @@ def get_enrolments() -> dict[str, list[str]]:
 
 
 def add_events(events: list[DERControl]):
+
+    records = [
+            {
+                "mRID": evt.mRID,
+                "creationTime": evt.creationTime,
+                "currentStatus": evt.EventStatus.currentStatus,
+                "start": evt.interval.start,
+                "duration": evt.interval.duration,
+                "randomizeStart": evt.randomizeStart,
+                "randomizeDuration": evt.randomizeDuration,
+                "controls": [x.model_dump() for x in evt.controls],
+                "program": evt.ProgramInfo.program,
+                "primacy": evt.ProgramInfo.primacy,
+            }
+            for evt in events
+        ]
     db_path = create_events_db()
     db = Database(db_path)
-    records = [
-        {
-            "mRID": evt.mRID,
-            "creationTime": evt.creationTime,
-            "currentStatus": evt.EventStatus.currentStatus,
-            "start": evt.interval.start,
-            "duration": evt.interval.duration,
-            "randomizeStart": evt.randomizeStart,
-            "randomizeDuration": evt.randomizeDuration,
-            "controls": [x.model_dump() for x in evt.controls],
-            "program": evt.ProgramInfo.program,
-            "primacy": evt.ProgramInfo.primacy,
-        }
-        for evt in events
-    ]
-    db["events"].insert_all(records, replace=True)
+    with db.conn:
+        db["events"].insert_all(records, replace=True)
 
 
 def update_mode_events():
@@ -222,7 +227,8 @@ def daily_summary_exists(der: str, mode: str, day: date | str) -> bool:
 def add_daily_summaries(records: list[dict]):
     db_path = create_summary_db()
     db = Database(db_path)
-    db["daily_summary"].insert_all(records, replace=True)
+    with db.conn:
+        db["daily_summary"].insert_all(records, replace=True)
 
 
 def add_mode_events(
@@ -230,8 +236,7 @@ def add_mode_events(
     mode: str,
     events: list[ModeEvent],
 ):
-    db_path = create_events_db()
-    db = Database(db_path)
+
     records = [
         {
             "der": der,
@@ -247,7 +252,11 @@ def add_mode_events(
         }
         for evt in events
     ]
-    db["mode_events"].insert_all(records, replace=True)
+
+    db_path = create_events_db()
+    db = Database(db_path)
+    with db.conn:
+        db["mode_events"].insert_all(records, replace=True)
 
 
 def flattened_event_to_object(evt: dict) -> DERControl:
@@ -337,16 +346,18 @@ def get_programs() -> list[str]:
     sql = "SELECT DISTINCT program FROM events ORDER BY program"
     db_path = create_events_db()
     db = Database(db_path)
-    res = db.query(sql)
-    return [x["program"] for x in res]
+    with db.conn:
+        res = db.query(sql)
+        return [x["program"] for x in res]
 
 
 def get_modes(der: str) -> list[str]:
     sql = "SELECT DISTINCT mode FROM mode_events WHERE der = :der ORDER BY 1"
     db_path = create_events_db()
     db = Database(db_path)
-    res = db.query(sql, {"der": der})
-    return [x["mode"] for x in res]
+    with db.conn:
+        res = db.query(sql, {"der": der})
+        return [x["mode"] for x in res]
 
 
 def get_mode_events(der: str, mode: str) -> list[ModeEvent]:
@@ -370,10 +381,11 @@ def get_mode_event_range(der: str, mode: str) -> tuple[int, int]:
     """
     db_path = create_events_db()
     db = Database(db_path)
-    res = list(db.query(sql, {"der": der, "mode": mode}))
-    row = res[0]
-    start = row["start"]
-    end = row["end"]
+    with db.conn:
+        res = list(db.query(sql, {"der": der, "mode": mode}))
+        row = res[0]
+        start = row["start"]
+        end = row["end"]
     return start, end
 
 
