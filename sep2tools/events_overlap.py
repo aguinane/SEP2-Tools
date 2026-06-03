@@ -1,4 +1,4 @@
-from .models import DERControl, ModeEvent
+from .event_models import DERControl, DERModeControl
 
 
 def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -28,38 +28,40 @@ def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, in
     return sorted(list(split_events))
 
 
-def split_overlapping_events(events: list[ModeEvent]) -> list[ModeEvent]:
+def split_overlapping_events(events: list[DERModeControl]) -> list[DERModeControl]:
     # TODO: Handle adding random start and duration values without overlap.
     new_events = []
-    times = [(x.start, x.end) for x in events]
+    times = [(x.intervalStart, x.intervalStart + x.intervalDuration) for x in events]
     for xstart, xend in non_overlapping_periods(times):
         for evt in events:
-            if evt.start >= xend:
+            evt_start = evt.intervalStart
+            evt_end = evt.intervalStart + evt.intervalDuration
+            if evt_start >= xend:
                 continue
-            if evt.end <= xstart:
+            if evt_end <= xstart:
                 continue
             nevt = evt.model_copy()
-            nevt.start = xstart
-            nevt.end = xend
+            nevt.intervalStart = xstart
+            nevt.intervalDuration = xend - xstart
             new_events.append(nevt)
     return new_events
 
 
-def condense_mode_events(events: list[ModeEvent]) -> list[ModeEvent]:
+def condense_mode_events(events: list[DERModeControl]) -> list[DERModeControl]:
     # First split the events
     events = split_overlapping_events(events)
 
     # Then pick lowest primacy, or latest creation time
     event_starts = {}
     for evt in events:
-        if evt.start not in event_starts:
-            event_starts[evt.start] = []
-        event_starts[evt.start].append(evt)
+        if evt.intervalStart not in event_starts:
+            event_starts[evt.intervalStart] = []
+        event_starts[evt.intervalStart].append(evt)
 
     new_events = []
     for start in event_starts:
         xevents = sorted(
-            event_starts[start], key=lambda x: (x.primacy, -x.creation_time)
+            event_starts[start], key=lambda x: (x.programPrimacy, -x.creationTime)
         )
         new_events.append(xevents[0])
 
@@ -70,38 +72,35 @@ def condense_mode_events(events: list[ModeEvent]) -> list[ModeEvent]:
             new_events2.append(evt)
             continue
         prev_evt = new_events[i - 1]
-        if prev_evt.mrid == evt.mrid:
-            evt.start = prev_evt.start  # Set to start from prev
+        if prev_evt.mRID == evt.mRID:
+            evt.intervalStart = prev_evt.intervalStart  # Set to start from prev
             new_events2.pop()  # Remove the previous
         new_events2.append(evt)
     return new_events2
 
 
-def condense_events(events: list[DERControl]) -> dict[str, list[ModeEvent]]:
+def condense_events(events: list[DERControl]) -> dict[str, list[DERModeControl]]:
     schedule = {}
     for evt in events:
-        mrid = evt.mRID
-        primacy = evt.ProgramInfo.primacy
-        creation_time = evt.creationTime
-        start = evt.interval.start
-        end = evt.interval.start + evt.interval.duration
-        rand_start = evt.randomizeStart
-        rand_dur = evt.randomizeDuration
         for cntrl in evt.controls:
-            value = cntrl.value * (10**cntrl.multiplier)
             mode = cntrl.mode
             if mode not in schedule:
                 schedule[mode] = []
-
-            me = ModeEvent(
-                mrid=mrid,
-                primacy=primacy,
-                creation_time=creation_time,
-                start=start,
-                end=end,
-                value=value,
-                rand_start=rand_start,
-                rand_dur=rand_dur,
+            me = DERModeControl(
+                mRID=evt.mRID,
+                programName=evt.programName,
+                programPrimacy=evt.programPrimacy,
+                currentStatus=evt.currentStatus,
+                statusTime=evt.statusTime,
+                isDefault=evt.isDefault,
+                creationTime=evt.creationTime,
+                intervalStart=evt.intervalStart,
+                intervalDuration=evt.intervalDuration,
+                randomizeStart=evt.randomizeStart,
+                randomizeDuration=evt.randomizeDuration,
+                controlMode=cntrl.mode,
+                controlValue=cntrl.value,
+                controlMultiplier=cntrl.multiplier,
             )
             schedule[mode].append(me)
 

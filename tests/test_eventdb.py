@@ -10,6 +10,7 @@ from sep2tools.eventsdb import (
     update_mode_events,
 )
 from sep2tools.examples import example_controls, example_default_control
+
 from sep2tools.times import current_date
 
 
