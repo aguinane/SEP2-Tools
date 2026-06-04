@@ -17,8 +17,8 @@ def example_default_control(
     now_utc = datetime.now(UTC).replace(microsecond=0)
     creation_time = int(now_utc.timestamp())
 
-    # To help with tests - set example default control at least one day ago
-    creation_time = creation_time - 86400
+    # To help with tests - create default control slightly more then one day ago
+    creation_time = creation_time - 90_000
     # A default starts when it is created
     start = creation_time
     # If replaced the new one will have a newer creation time and supersede
