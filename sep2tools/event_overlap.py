@@ -29,7 +29,6 @@ def non_overlapping_periods(events: list[tuple[int, int]]) -> list[tuple[int, in
 
 
 def split_overlapping_events(events: list[DERModeControl]) -> list[DERModeControl]:
-    # TODO: Handle adding random start and duration values without overlap.
     new_events = []
     times = [(x.intervalStart, x.intervalStart + x.intervalDuration) for x in events]
     for xstart, xend in non_overlapping_periods(times):

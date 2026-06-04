@@ -3,7 +3,7 @@ from sep2tools.event_models import (
     DERControl,
     DERControlBase,
 )
-from sep2tools.events_overlap import condense_events
+from sep2tools.event_overlap import condense_events
 
 EXAMPLE_EVENTS = [
     DERControl(
