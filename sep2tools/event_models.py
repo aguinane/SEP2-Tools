@@ -32,6 +32,10 @@ class DERControl(BaseModel):
     randomizeDuration: int = 0
     controls: list[DERControlBase] = []
 
+    @property
+    def intervalEnd(self) -> int:
+        return self.intervalStart + self.intervalDuration
+
 
 class DERModeControl(BaseModel):
     mRID: str
@@ -48,3 +52,7 @@ class DERModeControl(BaseModel):
     controlMode: str
     controlValue: int
     controlMultiplier: int = 0
+
+    @property
+    def intervalEnd(self) -> int:
+        return self.intervalStart + self.intervalDuration

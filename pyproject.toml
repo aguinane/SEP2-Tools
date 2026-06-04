@@ -46,4 +46,4 @@ fail_under = 75
 
 [tool.ruff.lint]
 select = ["A", "B", "E", "F", "I", "N", "PERF", "RUF", "SIM", "UP"]
-ignore = ['N815']
+ignore = ['N815','N802']

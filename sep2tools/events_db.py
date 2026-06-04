@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from sqlite_utils import Database
 
-from .event_models import DERControl, DERControlBase
+from .event_models import DERControl, DERControlBase, DERModeControl
 
 load_dotenv()
 log = logging.getLogger(__name__)
@@ -54,6 +54,10 @@ def create_events_db() -> Path:
             ),
             if_not_exists=True,
         )
+        events.create_index(("mRID",))
+        events.create_index(("controlMode",))
+        events.create_index(("programName",))
+        events.create_index(("intervalStart",))
     return EVENTS_DB
 
 
@@ -101,6 +105,24 @@ def row_to_event(row: dict) -> DERControl:
     )
 
 
+def row_to_mode_event(row: dict) -> DERModeControl:
+    return DERModeControl(
+        mRID=row["mRID"],
+        programName=row["programName"],
+        programPrimacy=row["programPrimacy"],
+        creationTime=row["creationTime"],
+        currentStatus=row["currentStatus"],
+        isDefault=row["isDefault"],
+        intervalStart=row["intervalStart"],
+        intervalDuration=row["intervalDuration"],
+        randomizeStart=row["randomizeStart"],
+        randomizeDuration=row["randomizeDuration"],
+        controlMode=row["controlMode"],
+        controlValue=row["controlValue"],
+        controlMultiplier=row["controlMultiplier"],
+    )
+
+
 def add_events(events: list[DERControl]):
     """Add events to the database."""
     records = []
@@ -115,16 +137,36 @@ def add_events(events: list[DERControl]):
 
 def delete_event(mrid: str):
     """Remove an event from the database"""
-    db_path = EVENTS_DB
     sql = "DELETE FROM events WHERE mRID = :mrid"
-    db = Database(db_path)
+    db = Database(EVENTS_DB)
     with db.conn:
         db.execute(sql, {"mrid": mrid})
 
 
+def supersede_event(mrid: str, control_mode: str):
+    """Update the CurrentStatus to Superseded (4)"""
+    sql = (
+        "UPDATE events SET currentStatus = 4 WHERE mRID = :mrid AND controlMode = :mode"
+    )
+    # Update the CurrentStatus to 4 (Superseded)
+    db = Database(EVENTS_DB)
+    with db.conn:
+        db.execute(sql, {"mrid": mrid, "mode": control_mode})
+
+
+def get_program_modes(program: str) -> list[str]:
+    sql = "SELECT DISTINCT controlMode FROM events WHERE programName = :prg"
+    db_path = create_events_db()
+    db = Database(db_path)
+    with db.conn:
+        res = db.query(sql, {"prg": program})
+        return [x["controlMode"] for x in res]
+
+
 def get_events(program: str) -> list[DERControl]:
-    sql = "SELECT * FROM events WHERE programName = :prg "
-    sql += "ORDER BY intervalStart, creationTime"
+    sql = """SELECT * FROM events
+    WHERE programName = :prg 
+    ORDER BY intervalStart, creationTime"""
     db_path = create_events_db()
     db = Database(db_path)
     events = {}
@@ -132,12 +174,31 @@ def get_events(program: str) -> list[DERControl]:
         res = db.query(sql, {"prg": program})
         for x in res:
             item = row_to_event(x)
+            if item.currentStatus in (2, 3, 4):
+                continue  # Skip cancelled or superseded
             mrid = item.mRID
             if mrid not in events:
                 events[mrid] = item
             else:
                 events[mrid].controls.append(item.controls)
     return list(events.values())
+
+
+def get_mode_events(program: str, mode: str) -> list[DERModeControl]:
+    sql = """SELECT * FROM events
+    WHERE programName = :prg AND controlMode = :mode
+    ORDER BY intervalStart, creationTime"""
+    db_path = create_events_db()
+    db = Database(db_path)
+    events = []
+    with db.conn:
+        res = db.query(sql, {"prg": program, "mode": mode})
+        for x in res:
+            item = row_to_mode_event(x)
+            if item.currentStatus in (2, 3, 4):
+                continue  # Skip cancelled or superseded
+            events.append(item)
+    return events
 
 
 def update_default(mrid: str, new_status: int, new_duration: int):
@@ -151,6 +212,7 @@ def update_default(mrid: str, new_status: int, new_duration: int):
 
 def cleanup_defaults():
     """If a default has been superseded, update the old events"""
+    log.info("Cleaning up default events")
     sql = """SELECT DISTINCT programName, mRID, intervalStart
     FROM events 
     WHERE intervalDuration = 999999999 AND currentStatus = 1
@@ -177,3 +239,66 @@ def cleanup_defaults():
 
             # Update the start in case there are even older defaults
             programs[program] = start
+
+
+def supersede_overlapping():
+    """Check for events with duplicate control events for same interval"""
+    log.info("Superseding overlapping events")
+    sql_dup = """
+    WITH overlaps AS (
+    SELECT programName, controlMode, intervalStart, intervalDuration, 
+        count(*) as num_events
+    FROM events
+    WHERE isDefault = 0
+    AND currentStatus IN (0,1,999)
+    GROUP BY programName, controlMode, intervalStart, intervalDuration
+    )
+    SELECT * FROM overlaps
+    WHERE num_events > 1
+    ORDER BY num_events DESC
+    """
+    sql_matches = """SELECT * FROM events
+    WHERE programName = :prg AND controlMode = :mode 
+    AND intervalStart = :start AND intervalDuration = :duration
+    ORDER BY creationTime DESC
+    """
+    db_path = create_events_db()
+    db = Database(db_path)
+    to_supersede = []
+    with db.conn:
+        res = list(db.query(sql_dup))
+        for x in res:
+            program = x["programName"]
+            mode = x["controlMode"]
+            start = x["intervalStart"]
+            duration = x["intervalDuration"]
+            num_events = x["num_events"]
+            if num_events <= 1:
+                continue  # No duplicates, move on
+
+            int_res = db.query(
+                sql_matches,
+                {"prg": program, "mode": mode, "start": start, "duration": duration},
+            )
+            next(int_res)
+            for y in int_res:
+                mrid = y["mRID"]
+                mode = y["controlMode"]
+                to_supersede.append((mrid, mode))
+    log.info(f"Found {len(to_supersede)} events to supersede due to overlap")
+    for mrid, mode in to_supersede:
+        supersede_event(mrid, mode)
+
+
+def delete_superseded():
+    """Delete events that have been superseded or cancelled"""
+    log.info("Deleting superseded events")
+    sql = """
+    SELECT * FROM events
+    WHERE isDefault = 0
+    AND currentStatus IN (2,3,4)
+    """
+    db_path = create_events_db()
+    db = Database(db_path)
+    with db.conn:
+        db.execute(sql)
