@@ -19,7 +19,9 @@ def get_mode_event_values(
     if strip_tz:
         min_ts = min_ts.replace(tzinfo=None)
     prev_val = None
-    for i, evt in enumerate(condense_mode_events(events)):
+    clean_events = condense_mode_events(events)
+    num_events = len(clean_events)
+    for i, evt in enumerate(clean_events):
         start = evt.intervalStart
         start_dt = timestamp_local_dt(start, tzinfo=tzinfo)
         if strip_tz:
@@ -36,5 +38,9 @@ def get_mode_event_values(
                 data.append({"ts": prev_end, "value": prev_val})
         if start_dt > min_ts:
             data.append({"ts": start_dt, "value": val})
+        if i == 0 and num_events == 1:
+            # Only the default event, so add in a short event
+            data.append({"ts": start_dt, "value": val})
+            data.append({"ts": start_dt + timedelta(seconds=60), "value": val})
         prev_val = val
     return data
