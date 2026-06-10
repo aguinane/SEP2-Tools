@@ -85,6 +85,14 @@ def execute_events_db(
     db.close()
 
 
+def vaccum_events_db(db_name: str = "events.db"):
+    """Vacuum the events database ."""
+    db_path = create_events_db(db_name)
+    db = Database(db_path)
+    db.vacuum()
+    db.close()
+
+
 def event_to_rows(evt: DERControl) -> list[dict[str, Any]]:
     """Convert an event to a list of rows for the database."""
     rows = []
@@ -371,3 +379,5 @@ def remove_old_events(retro_hours: float = 72.0, db_name: str = "events.db"):
     now = current_timestamp()
     cutoff_time = int(now - retro_hours * 3600)
     execute_events_db(sql, {"cutoff": cutoff_time}, db_name=db_name)
+
+    vaccum_events_db(db_name=db_name)
