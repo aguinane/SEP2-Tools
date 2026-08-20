@@ -72,6 +72,107 @@
 
     <p id="roleFlagResult" aria-live="polite"></p>
 
+    <h2>Quality Flag</h2>
+
+    <p>Calculates the quality flag hex for the chosen flags.</p>
+
+    <form id="qualityFlagForm">
+        <input type="checkbox" id="valid" name="valid" value="valid">
+        <label for="valid">valid</label><br>
+        <input type="checkbox" id="manual" name="manual" value="manual">
+        <label for="manual">manually edited</label><br>
+        <input type="checkbox" id="estimate" name="estimate" value="estimate">
+        <label for="estimate">estimated using reference day</label><br>
+        <input type="checkbox" id="interpolated" name="interpolated" value="interpolated">
+        <label for="interpolated">estimated using linear interpolation</label><br>
+        <input type="checkbox" id="questionable" name="questionable" value="questionable">
+        <label for="questionable">questionable</label><br>
+        <input type="checkbox" id="derived" name="derived" value="derived">
+        <label for="derived">derived</label><br>
+        <input type="checkbox" id="future" name="future" value="future">
+        <label for="future">projected (forecast)</label><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="qualityFlagResult" aria-live="polite"></p>
+
+    <h2>Connect Status</h2>
+
+    <p>Calculates the connect status hex for the chosen statuses.</p>
+
+    <form id="connectStatusForm">
+        <input type="checkbox" id="connected" name="connected" value="connected">
+        <label for="connected">connected</label><br>
+        <input type="checkbox" id="available" name="available" value="available">
+        <label for="available">available</label><br>
+        <input type="checkbox" id="operating" name="operating" value="operating">
+        <label for="operating">operating</label><br>
+        <input type="checkbox" id="test" name="test" value="test">
+        <label for="test">test</label><br>
+        <input type="checkbox" id="fault" name="fault" value="fault">
+        <label for="fault">fault/error</label><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="connectStatusResult" aria-live="polite"></p>
+
+    <h2>Operating Modes</h2>
+
+    <p>Calculates the supported operating modes hex.</p>
+
+    <form id="modesSupportedForm">
+        <label for="modesSupported">Select supported modes:</label><br>
+        <select id="modesSupported" name="modesSupported" multiple size="10">
+            <option value="Charge mode">Charge mode</option>
+            <option value="Discharge mode">Discharge mode</option>
+            <option value="opModConnect">opModConnect</option>
+            <option value="opModEnergize">opModEnergize</option>
+            <option value="opModFixedPFAbsorbW">opModFixedPFAbsorbW</option>
+            <option value="opModFixedPFInjectW">opModFixedPFInjectW</option>
+            <option value="opModFixedVar">opModFixedVar</option>
+            <option value="opModFixedW">opModFixedW</option>
+            <option value="opModFreqDroop">opModFreqDroop</option>
+            <option value="opModFreqWatt">opModFreqWatt</option>
+            <option value="opModHFRTMayTrip">opModHFRTMayTrip</option>
+            <option value="opModHFRTMustTrip">opModHFRTMustTrip</option>
+            <option value="opModHVRTMayTrip">opModHVRTMayTrip</option>
+            <option value="opModHVRTMomentaryCessation">opModHVRTMomentaryCessation</option>
+            <option value="opModHVRTMustTrip">opModHVRTMustTrip</option>
+            <option value="opModLFRTMayTrip">opModLFRTMayTrip</option>
+            <option value="opModLFRTMustTrip">opModLFRTMustTrip</option>
+            <option value="opModLVRTMayTrip">opModLVRTMayTrip</option>
+            <option value="opModLVRTMomentaryCessation">opModLVRTMomentaryCessation</option>
+            <option value="opModLVRTMustTrip">opModLVRTMustTrip</option>
+            <option value="opModMaxLimW">opModMaxLimW</option>
+            <option value="opModTargetVar">opModTargetVar</option>
+            <option value="opModTargetW">opModTargetW</option>
+            <option value="opModVoltVar">opModVoltVar</option>
+            <option value="opModVoltWatt">opModVoltWatt</option>
+            <option value="opModWattPF">opModWattPF</option>
+            <option value="opModWattVar">opModWattVar</option>
+        </select><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="modesSupportedResult" aria-live="polite"></p>
+
+    <h2>DOE Operating Modes</h2>
+
+    <p>Calculates the supported DOE operating modes hex.</p>
+
+    <form id="doeModesSupportedForm">
+        <label for="doeModesSupported">Select supported DOE modes:</label><br>
+        <select id="doeModesSupported" name="doeModesSupported" multiple size="4">
+            <option value="opModExpLimW">opModExpLimW</option>
+            <option value="opModImpLimW">opModImpLimW</option>
+            <option value="opModGenLimW">opModGenLimW</option>
+            <option value="opModLoadLimW">opModLoadLimW</option>
+        </select><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="doeModesSupportedResult" aria-live="polite"></p>
+
     <script>
         document.getElementById("mridForm").addEventListener("submit", function (event) {
             event.preventDefault();
@@ -122,6 +223,72 @@
             const hexString = parseInt(binaryString, 2).toString(16).toUpperCase().padStart(4, "0");
 
             document.getElementById("roleFlagResult").textContent =
+                "Binary: " + binaryString + " | Hex: " + hexString;
+        });
+
+        function calculateBitmap(formId, resultId, flags, reservedBits, hexWidth) {
+            document.getElementById(formId).addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                const binaryString = reservedBits + flags
+                    .map(function (flag) {
+                        return document.getElementById(flag).checked ? "1" : "0";
+                    })
+                    .reverse()
+                    .join("");
+                const hexString = parseInt(binaryString, 2).toString(16).toUpperCase().padStart(hexWidth, "0");
+
+                document.getElementById(resultId).textContent =
+                    "Binary: " + binaryString + " | Hex: " + hexString;
+            });
+        }
+
+        calculateBitmap("qualityFlagForm", "qualityFlagResult", [
+            "valid", "manual", "estimate", "interpolated", "questionable", "derived", "future"
+        ], "000000000", 4);
+
+        calculateBitmap("connectStatusForm", "connectStatusResult", [
+            "connected", "available", "operating", "test", "fault"
+        ], "000", 2);
+
+        document.getElementById("modesSupportedForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const selectedModes = Array.from(document.getElementById("modesSupported").selectedOptions)
+                .map(function (option) {
+                    return option.value;
+                });
+            const modeNames = [
+                "Charge mode", "Discharge mode", "opModConnect", "opModEnergize", "opModFixedPFAbsorbW",
+                "opModFixedPFInjectW", "opModFixedVar", "opModFixedW", "opModFreqDroop", "opModFreqWatt",
+                "opModHFRTMayTrip", "opModHFRTMustTrip", "opModHVRTMayTrip", "opModHVRTMomentaryCessation",
+                "opModHVRTMustTrip", "opModLFRTMayTrip", "opModLFRTMustTrip", "opModLVRTMayTrip",
+                "opModLVRTMomentaryCessation", "opModLVRTMustTrip", "opModMaxLimW", "opModTargetVar",
+                "opModTargetW", "opModVoltVar", "opModVoltWatt", "opModWattPF", "opModWattVar"
+            ];
+            const binaryString = "00000" + modeNames.map(function (mode) {
+                return selectedModes.includes(mode) ? "1" : "0";
+            }).reverse().join("");
+            const hexString = parseInt(binaryString, 2).toString(16).toUpperCase().padStart(8, "0");
+
+            document.getElementById("modesSupportedResult").textContent =
+                "Binary: " + binaryString + " | Hex: " + hexString;
+        });
+
+        document.getElementById("doeModesSupportedForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const selectedModes = Array.from(document.getElementById("doeModesSupported").selectedOptions)
+                .map(function (option) {
+                    return option.value;
+                });
+            const modeNames = ["opModExpLimW", "opModImpLimW", "opModGenLimW", "opModLoadLimW"];
+            const binaryString = "000000000000" + modeNames.map(function (mode) {
+                return selectedModes.includes(mode) ? "1" : "0";
+            }).reverse().join("");
+            const hexString = parseInt(binaryString, 2).toString(16).toUpperCase().padStart(8, "0");
+
+            document.getElementById("doeModesSupportedResult").textContent =
                 "Binary: " + binaryString + " | Hex: " + hexString;
         });
     </script>

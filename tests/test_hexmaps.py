@@ -54,9 +54,9 @@ def test_modes_supported():
     _binval, hexval = get_modes_supported(modes=modes)
     assert hexval == "00100000"
 
-    modes = ["opModEnergize", "opConnect"]
+    modes = ["opModEnergize", "opModConnect"]
     _binval, hexval = get_modes_supported(modes=modes)
-    assert hexval == "00000008"
+    assert hexval == "0000000C"
 
 
 def test_doe_modes_supported():
