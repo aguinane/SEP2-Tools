@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SEP2 Calculators</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+</head>
+
+<body>
+
+
+    <h1>SEP2 Calculators</h1>
+
+    <h2>External References</h2>
+
+    <p>The IANA PENs are <a href="https://www.iana.org/assignments/enterprise-numbers/">published here</a>.</p>
+    <p>The 11th NMI checksum can be calculated using a <a
+            href="https://checksumcalculators.com/AEMONMIChecksumCalculator.html">checksum calculator</a> if required.
+    </p>
+
+    <h2>Generate mRID</h2>
+
+    <p>When generating an mRID, the PEN should be used to make it unique to the vendor.</p>
+
+    <form id="mridForm">
+        <label for="mridPen">Enter the IANA PEN:</label><br>
+        <input type="number" id="mridPen" name="pen" min="0" step="1" max="9999999" value="1234" required><br>
+        <input type="submit" value="Generate">
+    </form>
+
+    <p id="mridResult" aria-live="polite"></p>
+
+    <h2>Cloud Proxy LFDI</h2>
+
+    <p>Calculates the virtual LFDI for the proxied EndDevice.</p>
+
+    <form id="lfdiForm">
+        <label for="nmi">Enter the NMI of the proxied EndDevice:</label><br>
+        <input type="text" id="nmi" name="nmi" minlength="11" maxlength="11" value="12345678907" required><br>
+        <label for="lfdiPen">Enter the IANA PEN:</label><br>
+        <input type="number" id="lfdiPen" name="pen" min="0" step="1" max="9999999" value="1234" required><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="lfdiResult" aria-live="polite"></p>
+
+
+    <h2>Role Flag</h2>
+
+    <p>Calculates the role flag hex for the chosen flags.</p>
+
+    <form id="roleFlagForm">
+        <input type="checkbox" id="isMirror" name="isMirror" value="isMirror">
+        <label for="isMirror">isMirror</label><br>
+        <input type="checkbox" id="isPremisesAggregationPoint" name="isPremisesAggregationPoint"
+            value="isPremisesAggregationPoint">
+        <label for="isPremisesAggregationPoint">isPremisesAggregationPoint</label><br>
+        <input type="checkbox" id="isPEV" name="isPEV" value="isPEV">
+        <label for="isPEV">isPEV</label><br>
+        <input type="checkbox" id="isDER" name="isDER" value="isDER">
+        <label for="isDER">isDER</label><br>
+        <input type="checkbox" id="isRevenueQuality" name="isRevenueQuality" value="isRevenueQuality">
+        <label for="isRevenueQuality">isRevenueQuality</label><br>
+        <input type="checkbox" id="isDC" name="isDC" value="isDC">
+        <label for="isDC">isDC</label><br>
+        <input type="checkbox" id="isSubmeter" name="isSubmeter" value="isSubmeter">
+        <label for="isSubmeter">isSubmeter</label><br>
+        <input type="submit" value="Calculate">
+    </form>
+
+    <p id="roleFlagResult" aria-live="polite"></p>
+
+    <script>
+        document.getElementById("mridForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const pen = document.getElementById("mridPen").value;
+            const uuid = crypto.randomUUID().replace(/-/g, "").slice(0, 32).toUpperCase();
+            const mrid = uuid + pen.padStart(8, "0");
+
+            document.getElementById("mridResult").innerHTML =
+                "mRID: <code>" + mrid + "</code>";
+        });
+
+        document.getElementById("lfdiForm").addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const nmi = document.getElementById("nmi").value;
+            const pen = document.getElementById("lfdiPen").value;
+            const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nmi));
+            const sha256 = Array.from(new Uint8Array(hashBuffer), function (byte) {
+                return byte.toString(16).padStart(2, "0");
+            }).join("").toUpperCase();
+            const lfdi = sha256.slice(0, 32) + pen.padStart(8, "0");
+
+            document.getElementById("lfdiResult").innerHTML =
+                "SHA-256 of NMI: <code>" + sha256 + "</code><br>" +
+                "Padded IANA PEN: <code>" + pen.padStart(8, "0") + "</code><br>" +
+                "Cloud Proxy LFDI: <code>" + lfdi + "</code>";
+        });
+
+        document.getElementById("roleFlagForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const flags = [
+                "isMirror",
+                "isPremisesAggregationPoint",
+                "isPEV",
+                "isDER",
+                "isRevenueQuality",
+                "isDC",
+                "isSubmeter"
+            ];
+            const binaryString = "000000000" + flags
+                .map(function (flag) {
+                    return document.getElementById(flag).checked ? "1" : "0";
+                })
+                .reverse()
+                .join("");
+            const hexString = parseInt(binaryString, 2).toString(16).toUpperCase().padStart(4, "0");
+
+            document.getElementById("roleFlagResult").textContent =
+                "Binary: " + binaryString + " | Hex: " + hexString;
+        });
+    </script>
+
+
+
+</body>
+
+</html>
