@@ -38,7 +38,8 @@
 
     <form id="lfdiForm">
         <label for="nmi">Enter the NMI of the proxied EndDevice:</label><br>
-        <input type="text" id="nmi" name="nmi" minlength="11" maxlength="11" value="12345678907" required><br>
+        <input type="text" id="nmi" name="nmi" minlength="11" maxlength="11" pattern="[A-Z0-9]{11}" value="A1234567892"
+            required><br>
         <label for="lfdiPen">Enter the IANA PEN:</label><br>
         <input type="number" id="lfdiPen" name="pen" min="0" step="1" max="9999999" value="1234" required><br>
         <input type="submit" value="Calculate">
@@ -185,11 +186,38 @@
                 "mRID: <code>" + mrid + "</code>";
         });
 
+        function nmiChecksum(nmi) {
+            let total = 0;
+            for (let i = 0; i < nmi.length; i++) {
+                const charCode = nmi[nmi.length - 1 - i].charCodeAt(0);
+                const value = i % 2 === 1 ? charCode : charCode * 2;
+                total += String(value).split("").reduce(function (sum, digit) {
+                    return sum + Number(digit);
+                }, 0);
+            }
+            return (10 - (total % 10)) % 10;
+        }
+
         document.getElementById("lfdiForm").addEventListener("submit", async function (event) {
             event.preventDefault();
 
-            const nmi = document.getElementById("nmi").value;
+            const nmi = document.getElementById("nmi").value.toUpperCase();
             const pen = document.getElementById("lfdiPen").value;
+            if (!/^[A-Z0-9]{11}$/.test(nmi)) {
+                document.getElementById("lfdiResult").textContent =
+                    "NMI must be 11 characters using only letters and digits.";
+                return;
+            }
+
+            const expectedChecksum = nmiChecksum(nmi.slice(0, 10));
+            const suppliedChecksum = Number(nmi[10]);
+
+            if (expectedChecksum !== suppliedChecksum) {
+                document.getElementById("lfdiResult").textContent =
+                    "Invalid NMI checksum. Expected: " + expectedChecksum;
+                return;
+            }
+
             const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nmi));
             const sha256 = Array.from(new Uint8Array(hashBuffer), function (byte) {
                 return byte.toString(16).padStart(2, "0");
